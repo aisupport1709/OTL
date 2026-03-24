@@ -425,5 +425,70 @@ async function loadInvoiceStatus() {
     }
 }
 
+// ─── Export PDF ──────────────────────────────────────────────────────
+
+async function exportToPDF() {
+    const btn = document.getElementById('btn-export-pdf');
+    const originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Generating...';
+
+    try {
+        const { jsPDF } = window.jspdf;
+        const content = document.querySelector('main');
+
+        const canvas = await html2canvas(content, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#f3f4f6',
+            logging: false,
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+        const pageW = pdf.internal.pageSize.getWidth();
+        const pageH = pdf.internal.pageSize.getHeight();
+        const margin = 10;
+        const usableW = pageW - margin * 2;
+        const imgW = canvas.width;
+        const imgH = canvas.height;
+        const ratio = usableW / (imgW / (96 / 25.4)); // px to mm
+        const scaledH = (imgH / (96 / 25.4)) * (usableW / (imgW / (96 / 25.4)));
+
+        // Split across pages if content is taller than one page
+        const usableH = pageH - margin * 2;
+        const totalPages = Math.ceil(scaledH / usableH);
+        const sliceH = Math.floor(imgH / totalPages);
+
+        for (let i = 0; i < totalPages; i++) {
+            if (i > 0) pdf.addPage();
+            const sliceCanvas = document.createElement('canvas');
+            sliceCanvas.width = imgW;
+            const remainH = imgH - i * sliceH;
+            sliceCanvas.height = i === totalPages - 1 ? remainH : sliceH;
+            const ctx = sliceCanvas.getContext('2d');
+            ctx.drawImage(canvas, 0, -i * sliceH);
+            const sliceData = sliceCanvas.toDataURL('image/png');
+            const sliceScaledH = (sliceCanvas.height / (96 / 25.4)) * (usableW / (imgW / (96 / 25.4)));
+            pdf.addImage(sliceData, 'PNG', margin, margin, usableW, sliceScaledH);
+        }
+
+        const filters = [];
+        const month = document.getElementById('filter-month').value;
+        const category = document.getElementById('filter-category').value;
+        if (month) filters.push(month);
+        if (category) filters.push(category);
+        const suffix = filters.length ? '_' + filters.join('_') : '';
+        pdf.save(`dashboard${suffix}.pdf`);
+    } catch (err) {
+        console.error('PDF export failed', err);
+        alert('Failed to export PDF. Please try again.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    }
+}
+
 // ─── Init ────────────────────────────────────────────────────────────
 loadDashboard();
