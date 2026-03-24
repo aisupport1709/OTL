@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}Invoice Data - OTL Reports{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h2 class="text-2xl font-bold text-gray-800 mb-3"><i class="bi bi-table"></i> Invoice Booking Data</h2>
+    <div class="flex gap-2 items-center">
+        <!-- View Toggle -->
+        <div class="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
+            <button id="btn-standard" onclick="setView('standard')"
+                class="px-3 py-1.5 font-medium transition bg-blue-600 text-white">
+                Standard
+            </button>
+            <button id="btn-full" onclick="setView('full')"
+                class="px-3 py-1.5 font-medium transition bg-white text-gray-600 hover:bg-gray-50">
+                Full View
+            </button>
+        </div>
+        <input type="text" id="search-input" placeholder="Search invoices..." oninput="debounceSearch()"
+            class="w-64 px-3 py-1.5 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+        <button onclick="loadData(1)" class="px-3 py-1.5 text-sm border border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 transition">
+            <i class="bi bi-arrow-clockwise"></i>
+        </button>
+    </div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-800 text-white" id="data-thead"></thead>
+            <tbody id="data-tbody" class="divide-y divide-gray-100">
+                <tr><td colspan="12" class="text-center py-8 text-gray-400">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="px-4 py-3 border-t border-gray-100 flex items-center gap-4">
+        <div id="pagination" class="flex gap-1"></div>
+        <span id="data-info" class="text-xs text-gray-500">-</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPage = 1;
+let currentView = 'standard';
+let searchTimeout;
+
+const TH = 'px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap';
+const TH_R = 'px-3 py-2.5 text-right text-xs font-medium uppercase tracking-wider whitespace-nowrap';
+const TD = 'px-3 py-2 text-gray-600 whitespace-nowrap';
+const TD_R = 'px-3 py-2 text-gray-600 text-right whitespace-nowrap';
+const TD_TRUNC = 'px-3 py-2 text-gray-600 max-w-[200px] truncate';
+
+const STANDARD_COLS = [
+    { header: 'Invoice No',  thClass: TH,   render: r => `<td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">${r.invoice_no || ''}</td>` },
+    { header: 'Invoice Date', thClass: TH,   render: r => `<td class="${TD}">${fmtDate(r.invoice_date)}</td>` },
+    { header: 'Customer',     thClass: TH,   render: r => `<td class="${TD_TRUNC}">${r.customer_name || ''}</td>` },
+    { header: 'Booking Code', thClass: TH,   render: r => `<td class="${TD}">${r.booking_code || ''}</td>` },
+    { header: 'Category',     thClass: TH,   render: r => `<td class="${TD}">${r.booking_category || ''}</td>` },
+    { header: 'From',         thClass: TH,   render: r => `<td class="${TD}">${r.location_from || ''}</td>` },
+    { header: 'To',           thClass: TH,   render: r => `<td class="${TD}">${r.location_to || ''}</td>` },
+    { header: 'Currency',     thClass: TH,   render: r => `<td class="${TD}">${r.currency || ''}</td>` },
+    { header: 'Local Total',  thClass: TH_R, render: r => `<td class="${TD_R}">${formatNum(r.local_total)}</td>` },
+    { header: 'Tax',          thClass: TH_R, render: r => `<td class="${TD_R}">${formatNum(r.local_tax)}</td>` },
+    { header: 'Total w/ Tax', thClass: TH_R, render: r => `<td class="${TD_R}">${formatNum(r.local_total_with_tax)}</td>` },
+    { header: 'Status',       thClass: TH,   render: r => `<td class="px-3 py-2 whitespace-nowrap"><span class="px-2 py-0.5 text-xs font-medium rounded-full ${statusClasses(r.invoice_status)}">${r.invoice_status || ''}</span></td>` },
+];
+
+const FULL_COLS = [
+    { header: 'Invoice No',       thClass: TH,   render: r => `<td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">${r.invoice_no || ''}</td>` },
+    { header: 'Invoice Date',     thClass: TH,   render: r => `<td class="${TD}">${fmtDate(r.invoice_date)}</td>` },
+    { header: 'Revenue Date',     thClass: TH,   render: r => `<td class="${TD}">${fmtDate(r.revenue_date)}</td>` },
+    { header: 'Month',            thClass: TH,   render: r => `<td class="${TD}">${r.month || ''}</td>` },
+    { header: 'Acc Code',         thClass: TH,   render: r => `<td class="${TD}">${r.acc_code || ''}</td>` },
+    { header: 'Customer Name',    thClass: TH,   render: r => `<td class="${TD_TRUNC}">${r.customer_name || ''}</td>` },
+    { header: 'Reference ID',     thClass: TH,   render: r => `<td class="${TD}">${r.reference_id || ''}</td>` },
+    { header: 'Booking Code',     thClass: TH,   render: r => `<td class="${TD}">${r.booking_code || ''}</td>` },
+    { header: 'Booking Master Desc', thClass: TH, render: r => `<td class="${TD_TRUNC}">${r.booking_master_desc || ''}</td>` },
+    { header: 'Booking Departure',thClass: TH,   render: r => `<td class="${TD}">${r.booking_departure || ''}</td>` },
+    { header: 'Booking Category', thClass: TH,   render: r => `<td class="${TD}">${r.booking_category || ''}</td>` },
+    { header: 'Goods',            thClass: TH,   render: r => `<td class="${TD_TRUNC}">${r.goods || ''}</td>` },
+    { header: 'Location From',    thClass: TH,   render: r => `<td class="${TD}">${r.location_from || ''}</td>` },
+    { header: 'Location To',      thClass: TH,   render: r => `<td class="${TD}">${r.location_to || ''}</td>` },
+    { header: 'Group Billing',    thClass: TH,   render: r => `<td class="${TD}">${r.group_billing || ''}</td>` },
+    { header: 'Invoice Item Desc',thClass: TH,   render: r => `<td class="${TD_TRUNC}">${r.invoice_item_desc || ''}</td>` },
+    { header: 'Remarks',          thClass: TH,   render: r => `<td class="${TD_TRUNC}">${r.remarks || ''}</td>` },
+    { header: 'Currency',         thClass: TH,   render: r => `<td class="${TD}">${r.currency || ''}</td>` },
+    { header: 'Quantity',         thClass: TH_R, render: r => `<td class="${TD_R}">${formatNum(r.quantity)}</td>` },
+    { header: 'Unit Price',       thClass: TH_R, render: r => `<td class="${TD_R}">${formatNum(r.unit_price)}</td>` },
+    { header: 'Foreign Total',    thClass: TH_R, render: r => `<td class="${TD_R}">${formatNum(r.foreign_total)}</td>` },
+    { header: 'Foreign Tax',      thClass: TH_R, render: r => `<td class="${TD_R}">${formatNum(r.foreign_tax)}</td>` },
+    { header: 'Foreign Total w/ Tax', thClass: TH_R, render: r => `<td class="${TD_R}">${formatNum(r.foreign_total_with_tax)}</td>` },
+    { header: 'Local Total',      thClass: TH_R, render: r => `<td class="${TD_R}">${formatNum(r.local_total)}</td>` },
+    { header: 'Local Tax',        thClass: TH_R, render: r => `<td class="${TD_R}">${formatNum(r.local_tax)}</td>` },
+    { header: 'Local Total w/ Tax', thClass: TH_R, render: r => `<td class="${TD_R}">${formatNum(r.local_total_with_tax)}</td>` },
+    { header: 'Status',           thClass: TH,   render: r => `<td class="px-3 py-2 whitespace-nowrap"><span class="px-2 py-0.5 text-xs font-medium rounded-full ${statusClasses(r.invoice_status)}">${r.invoice_status || ''}</span></td>` },
+    { header: 'Last Modified User', thClass: TH,  render: r => `<td class="${TD}">${r.last_modified_user || ''}</td>` },
+    { header: 'Last Modified',    thClass: TH,   render: r => `<td class="${TD}">${fmtDate(r.last_modified_date_time)}</td>` },
+    { header: 'Created By',       thClass: TH,   render: r => `<td class="${TD}">${r.created_by || ''}</td>` },
+    { header: 'Created Date',     thClass: TH,   render: r => `<td class="${TD}">${fmtDate(r.created_date_time)}</td>` },
+    { header: 'Actual Departure', thClass: TH,   render: r => `<td class="${TD}">${fmtDate(r.actual_departure)}</td>` },
+    { header: 'Actual Arrival',   thClass: TH,   render: r => `<td class="${TD}">${fmtDate(r.actual_arrival)}</td>` },
+    { header: 'Req. Arrival',     thClass: TH,   render: r => `<td class="${TD}">${fmtDate(r.booking_requested_arrival)}</td>` },
+    { header: 'Fast Invoice',     thClass: TH,   render: r => `<td class="${TD}">${r.fast_invoice || ''}</td>` },
+    { header: 'TWB',              thClass: TH,   render: r => `<td class="${TD}">${r.twb || ''}</td>` },
+];
+
+function getCols() {
+    return currentView === 'full' ? FULL_COLS : STANDARD_COLS;
+}
+
+function fmtDate(v) {
+    if (!v) return '';
+    return new Date(v).toLocaleDateString();
+}
+
+function setView(view) {
+    currentView = view;
+    const btnStd = document.getElementById('btn-standard');
+    const btnFull = document.getElementById('btn-full');
+    if (view === 'standard') {
+        btnStd.className = 'px-3 py-1.5 font-medium transition bg-blue-600 text-white';
+        btnFull.className = 'px-3 py-1.5 font-medium transition bg-white text-gray-600 hover:bg-gray-50';
+    } else {
+        btnStd.className = 'px-3 py-1.5 font-medium transition bg-white text-gray-600 hover:bg-gray-50';
+        btnFull.className = 'px-3 py-1.5 font-medium transition bg-blue-600 text-white';
+    }
+    loadData(currentPage);
+}
+
+function debounceSearch() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => loadData(1), 300);
+}
+
+async function loadData(page) {
+    currentPage = page;
+    const search = document.getElementById('search-input').value;
+    const params = new URLSearchParams({ page, per_page: 50, search });
+
+    try {
+        const resp = await fetch(`/api/invoice-bookings?${params}`);
+        const data = await resp.json();
+        renderTable(data);
+    } catch (err) {
+        const cols = getCols();
+        document.getElementById('data-tbody').innerHTML =
+            `<tr><td colspan="${cols.length}" class="text-center py-8 text-red-500">Error loading data</td></tr>`;
+    }
+}
+
+function renderTable(data) {
+    const cols = getCols();
+    const thead = document.getElementById('data-thead');
+    const tbody = document.getElementById('data-tbody');
+
+    // Render header
+    thead.innerHTML = '<tr>' + cols.map(c => `<th class="${c.thClass}">${c.header}</th>`).join('') + '</tr>';
+
+    if (!data.data.length) {
+        tbody.innerHTML = `<tr><td colspan="${cols.length}" class="text-center py-8 text-gray-400">No data found</td></tr>`;
+        document.getElementById('data-info').textContent = '0 records';
+        document.getElementById('pagination').innerHTML = '';
+        return;
+    }
+
+    tbody.innerHTML = data.data.map(r =>
+        `<tr class="hover:bg-gray-50 transition">${cols.map(c => c.render(r)).join('')}</tr>`
+    ).join('');
+
+    const start = (data.page - 1) * data.per_page + 1;
+    const end = Math.min(data.page * data.per_page, data.total);
+    document.getElementById('data-info').textContent = `Showing ${start}-${end} of ${data.total} records`;
+
+    renderPagination(data.page, data.pages);
+}
+
+function renderPagination(page, pages) {
+    const el = document.getElementById('pagination');
+    if (pages <= 1) { el.innerHTML = ''; return; }
+
+    const btnClass = 'px-2.5 py-1 text-xs rounded border transition';
+    const activeClass = 'bg-blue-600 text-white border-blue-600';
+    const normalClass = 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50';
+    const disabledClass = 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed';
+    const dots = `<span class="px-1 text-xs text-gray-400">...</span>`;
+
+    // Build page numbers: first 2, around current, last 2
+    const pageNums = new Set();
+    // First 2
+    for (let i = 1; i <= Math.min(2, pages); i++) pageNums.add(i);
+    // Around current
+    for (let i = Math.max(1, page - 1); i <= Math.min(pages, page + 1); i++) pageNums.add(i);
+    // Last 2
+    for (let i = Math.max(1, pages - 1); i <= pages; i++) pageNums.add(i);
+
+    const sorted = [...pageNums].sort((a, b) => a - b);
+
+    let html = `<button class="${btnClass} ${page === 1 ? disabledClass : normalClass}" onclick="loadData(${page - 1})" ${page === 1 ? 'disabled' : ''}>Prev</button>`;
+
+    let prev = 0;
+    for (const p of sorted) {
+        if (prev && p - prev > 1) html += dots;
+        html += `<button class="${btnClass} ${p === page ? activeClass : normalClass}" onclick="loadData(${p})">${p}</button>`;
+        prev = p;
+    }
+
+    html += `<button class="${btnClass} ${page === pages ? disabledClass : normalClass}" onclick="loadData(${page + 1})" ${page === pages ? 'disabled' : ''}>Next</button>`;
+    el.innerHTML = html;
+}
+
+function statusClasses(status) {
+    if (!status) return 'bg-gray-100 text-gray-600';
+    const s = status.toLowerCase();
+    if (s.includes('confirm') || s.includes('complete') || s.includes('approve')) return 'bg-green-100 text-green-700';
+    if (s.includes('cancel') || s.includes('void')) return 'bg-red-100 text-red-700';
+    if (s.includes('draft') || s.includes('pending')) return 'bg-amber-100 text-amber-700';
+    return 'bg-blue-100 text-blue-700';
+}
+
+loadData(1);
+</script>
+{% endblock %}

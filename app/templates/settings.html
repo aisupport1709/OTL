@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Settings - OTL Reports{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h2 class="text-2xl font-bold text-gray-800"><i class="bi bi-gear"></i> Settings</h2>
+</div>
+
+<div class="max-w-2xl">
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Currency Settings</h3>
+
+        <div class="mb-4">
+            <label for="local-currency" class="block text-sm font-medium text-gray-700 mb-1">Local Currency</label>
+            <p class="text-xs text-gray-500 mb-2">The local currency used for Local Total, Local Tax, and Local Total With Tax columns in reports.</p>
+            <div class="flex gap-2">
+                <input type="text" id="local-currency" maxlength="3" placeholder="VND"
+                    class="w-32 px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase">
+                <button onclick="saveCurrency()" id="btn-save"
+                    class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+                    Save
+                </button>
+            </div>
+        </div>
+
+        <div id="save-status" class="hidden text-sm mt-3 px-3 py-2 rounded-lg"></div>
+
+        <div class="mt-6 pt-4 border-t border-gray-100">
+            <h4 class="text-sm font-medium text-gray-700 mb-2">Currency Column Reference</h4>
+            <div class="text-xs text-gray-500 space-y-1">
+                <p><span class="font-medium text-gray-700">Foreign currency columns:</span> Currency, Unit Price, Foreign Total, Foreign Tax, Foreign Total With Tax — these use the currency specified in each invoice row.</p>
+                <p><span class="font-medium text-gray-700">Local currency columns:</span> Local Total, Local Tax, Local Total With Tax — these always use the local currency configured above.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadSettings() {
+    try {
+        const resp = await fetch('/api/settings');
+        const data = await resp.json();
+        document.getElementById('local-currency').value = data.local_currency || 'VND';
+    } catch (err) {
+        console.error('Failed to load settings', err);
+    }
+}
+
+async function saveCurrency() {
+    const value = document.getElementById('local-currency').value.trim().toUpperCase();
+    if (!value) return;
+
+    const btn = document.getElementById('btn-save');
+    const status = document.getElementById('save-status');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    try {
+        const resp = await fetch('/api/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ local_currency: value }),
+        });
+        const data = await resp.json();
+        document.getElementById('local-currency').value = data.local_currency;
+
+        status.className = 'text-sm mt-3 px-3 py-2 rounded-lg bg-green-50 text-green-700';
+        status.textContent = 'Settings saved successfully.';
+    } catch (err) {
+        status.className = 'text-sm mt-3 px-3 py-2 rounded-lg bg-red-50 text-red-700';
+        status.textContent = 'Failed to save settings.';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save';
+        setTimeout(() => { status.className = 'hidden'; }, 3000);
+    }
+}
+
+loadSettings();
+</script>
+{% endblock %}

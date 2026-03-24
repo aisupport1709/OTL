@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - OTL Reports{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-bold text-gray-800"><i class="bi bi-speedometer2"></i> Dashboard</h2>
+    <div class="flex gap-2 items-center">
+        <!-- Month Filter -->
+        <select id="filter-month" onchange="loadDashboard()"
+            class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none">
+            <option value="">All Months</option>
+        </select>
+        <!-- Category Filter (FTL/LTL) -->
+        <select id="filter-category" onchange="loadDashboard()"
+            class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none">
+            <option value="">All Categories</option>
+            <option value="FTL">FTL</option>
+            <option value="LTL">LTL</option>
+        </select>
+        <!-- Currency Selector -->
+        <select id="filter-currency" onchange="onCurrencyChange()"
+            class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none">
+        </select>
+        <button onclick="resetFilters()" class="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition">
+            <i class="bi bi-x-circle"></i> Reset
+        </button>
+        <button onclick="loadDashboard()" class="px-3 py-1.5 text-sm border border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 transition">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+    </div>
+</div>
+
+<!-- Active Filter Badge -->
+<div id="active-filters" class="mb-4 hidden">
+    <div class="flex gap-2 items-center text-sm">
+        <span class="text-gray-500">Active filters:</span>
+        <div id="filter-badges" class="flex gap-1"></div>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow-sm p-4 text-center hover:shadow-md transition">
+        <div class="text-3xl text-blue-500 mb-1"><i class="bi bi-receipt"></i></div>
+        <p class="text-xs uppercase tracking-wide text-gray-500">Total Invoices</p>
+        <p class="text-xl font-bold text-gray-800 mt-1" id="kpi-invoices">-</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-4 text-center hover:shadow-md transition">
+        <div class="text-3xl text-green-500 mb-1"><i class="bi bi-currency-dollar"></i></div>
+        <p class="text-xs uppercase tracking-wide text-gray-500">Total Revenue</p>
+        <p class="text-xl font-bold text-gray-800 mt-1" id="kpi-revenue">-</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-4 text-center hover:shadow-md transition">
+        <div class="text-3xl text-cyan-500 mb-1"><i class="bi bi-cash-stack"></i></div>
+        <p class="text-xs uppercase tracking-wide text-gray-500">Total Tax</p>
+        <p class="text-xl font-bold text-gray-800 mt-1" id="kpi-tax">-</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-4 text-center hover:shadow-md transition">
+        <div class="text-3xl text-amber-500 mb-1"><i class="bi bi-people"></i></div>
+        <p class="text-xs uppercase tracking-wide text-gray-500">Customers</p>
+        <p class="text-xl font-bold text-gray-800 mt-1" id="kpi-customers">-</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-4 text-center hover:shadow-md transition">
+        <div class="text-3xl text-red-500 mb-1"><i class="bi bi-bookmark"></i></div>
+        <p class="text-xs uppercase tracking-wide text-gray-500">Bookings</p>
+        <p class="text-xl font-bold text-gray-800 mt-1" id="kpi-bookings">-</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-4 text-center hover:shadow-md transition">
+        <div class="text-3xl text-gray-500 mb-1"><i class="bi bi-database"></i></div>
+        <p class="text-xs uppercase tracking-wide text-gray-500">Records</p>
+        <p class="text-xl font-bold text-gray-800 mt-1" id="kpi-records">-</p>
+    </div>
+</div>
+
+<!-- FTL vs LTL Comparison -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow-sm">
+        <div class="px-5 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
+            <i class="bi bi-truck"></i> FTL vs LTL Revenue by Month
+        </div>
+        <div class="p-4 chart-container"><canvas id="chart-ftl-ltl"></canvas></div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm">
+        <div class="px-5 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
+            <i class="bi bi-graph-up"></i> Revenue by Month
+        </div>
+        <div class="p-4 chart-container"><canvas id="chart-revenue-month"></canvas></div>
+    </div>
+</div>
+
+<!-- Top 10 Routes + Category -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+    <div class="lg:col-span-2 bg-white rounded-xl shadow-sm">
+        <div class="px-5 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
+            <i class="bi bi-geo-alt"></i> Top 10 Routes by Revenue
+        </div>
+        <div class="p-4 chart-container"><canvas id="chart-routes"></canvas></div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm">
+        <div class="px-5 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
+            <i class="bi bi-pie-chart"></i> Revenue by Category
+        </div>
+        <div class="p-4 chart-container"><canvas id="chart-category"></canvas></div>
+    </div>
+</div>
+
+<!-- Top Customers + Status + Currency -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow-sm">
+        <div class="px-5 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
+            <i class="bi bi-trophy"></i> Top 10 Customers by Revenue
+        </div>
+        <div class="p-4 chart-container"><canvas id="chart-top-customers"></canvas></div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm">
+        <div class="px-5 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
+            <i class="bi bi-info-circle"></i> Revenue Summary
+        </div>
+        <div class="p-5" id="revenue-summary-body">
+            <p class="text-gray-400 text-center py-10">Loading...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Status -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow-sm">
+        <div class="px-5 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
+            <i class="bi bi-check-circle"></i> Invoice Status
+        </div>
+        <div class="p-4 chart-container"><canvas id="chart-status"></canvas></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
