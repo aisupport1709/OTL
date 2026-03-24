@@ -77,7 +77,30 @@ OTL REPORTS - BUSINESS LOGIC
 - Currency symbol is displayed BEFORE the value (e.g. VND 1,234,567.89)
 - Tooltips on all charts display values with the selected currency label
 
-6. SETTINGS
+6. INVOICE DATA PAGE
+--------------------------------------------------------------------------------
+- Table supports two view modes:
+  * Standard: 12 key columns (Invoice No, Date, Customer, Booking Code,
+    Category, From, To, Currency, Local Total, Tax, Total w/ Tax, Status)
+  * Full View: all 35 columns including foreign currency columns, timestamps,
+    goods, remarks, and departure/arrival dates
+- Search behavior:
+  * Search is triggered by pressing Enter or clicking the search icon
+  * Searches across: Invoice No, Customer Name, Booking Code, Booking Master Desc
+  * Case-insensitive partial match (ILIKE %term%)
+  * Reset button clears the search and reloads all data
+- Pagination:
+  * 50 records per page
+  * Shown above the table
+  * Displays first 2 pages + current page ± 1 + last 2 pages with ellipsis
+  * Shows record range and total count (e.g. "Showing 1–50 of 1,234 records")
+- Export:
+  * Export button downloads all current search results to .xlsx
+  * File name: invoice_bookings_export.xlsx
+  * Exports all matching records (not paginated — full result set)
+  * Includes all columns; excludes internal "id" column
+
+7. SETTINGS
 --------------------------------------------------------------------------------
 - Local Currency: configurable via Settings page (e.g. VND, USD, SGD)
   Affects display labels on dashboard KPIs, revenue summary, and chart tooltips

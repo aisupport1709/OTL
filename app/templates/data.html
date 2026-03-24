@@ -2,9 +2,11 @@
 {% block title %}Invoice Data - OTL Reports{% endblock %}
 
 {% block content %}
-<div class="mb-6">
+<div class="mb-3">
     <h2 class="text-2xl font-bold text-gray-800 mb-3"><i class="bi bi-table"></i> Invoice Booking Data</h2>
-    <div class="flex gap-2 items-center">
+
+    <!-- Controls row -->
+    <div class="flex gap-2 items-center flex-wrap">
         <!-- View Toggle -->
         <div class="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
             <button id="btn-standard" onclick="setView('standard')"
@@ -16,12 +18,43 @@
                 Full View
             </button>
         </div>
-        <input type="text" id="search-input" placeholder="Search invoices..." oninput="debounceSearch()"
-            class="w-64 px-3 py-1.5 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
-        <button onclick="loadData(1)" class="px-3 py-1.5 text-sm border border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 transition">
-            <i class="bi bi-arrow-clockwise"></i>
+
+        <!-- Search input + icon -->
+        <div class="relative flex items-center">
+            <input type="text" id="search-input" placeholder="Search invoices..."
+                onkeydown="onSearchKey(event)"
+                class="w-64 pl-3 pr-9 py-1.5 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+            <button onclick="doSearch()" title="Search"
+                class="absolute right-2 text-gray-400 hover:text-blue-600 transition">
+                <i class="bi bi-search"></i>
+            </button>
+        </div>
+
+        <!-- Reset -->
+        <button onclick="resetData()" title="Clear search and reload"
+            class="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition">
+            <i class="bi bi-x-circle"></i> Reset
+        </button>
+
+        <!-- Export -->
+        <button onclick="exportData()" title="Export current search results to Excel"
+            class="px-3 py-1.5 text-sm border border-green-500 text-green-700 rounded-lg hover:bg-green-50 transition">
+            <i class="bi bi-file-earmark-excel"></i> Export
         </button>
     </div>
+
+    <!-- Search note -->
+    <p class="mt-1.5 text-xs text-gray-400">
+        <i class="bi bi-info-circle"></i>
+        Search applies to: <span class="font-medium text-gray-500">Invoice No, Customer Name, Booking Code, Booking Master Desc</span>.
+        Press <kbd class="px-1 py-0.5 text-xs bg-gray-100 border border-gray-300 rounded">Enter</kbd> or click <i class="bi bi-search"></i> to search.
+    </p>
+</div>
+
+<!-- Pagination row (above table) -->
+<div class="flex items-center gap-3 mb-2">
+    <div id="pagination" class="flex gap-1"></div>
+    <span id="data-info" class="text-xs text-gray-500">-</span>
 </div>
 
 <div class="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -33,10 +66,6 @@
             </tbody>
         </table>
     </div>
-    <div class="px-4 py-3 border-t border-gray-100 flex items-center gap-4">
-        <div id="pagination" class="flex gap-1"></div>
-        <span id="data-info" class="text-xs text-gray-500">-</span>
-    </div>
 </div>
 {% endblock %}
 
@@ -44,7 +73,6 @@
 <script>
 let currentPage = 1;
 let currentView = 'standard';
-let searchTimeout;
 
 const TH = 'px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap';
 const TH_R = 'px-3 py-2.5 text-right text-xs font-medium uppercase tracking-wider whitespace-nowrap';
@@ -129,9 +157,24 @@ function setView(view) {
     loadData(currentPage);
 }
 
-function debounceSearch() {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => loadData(1), 300);
+function onSearchKey(e) {
+    if (e.key === 'Enter') doSearch();
+}
+
+function doSearch() {
+    loadData(1);
+}
+
+function resetData() {
+    document.getElementById('search-input').value = '';
+    loadData(1);
+}
+
+function exportData() {
+    const search = document.getElementById('search-input').value.trim();
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    window.location.href = `/api/invoice-bookings/export?${params}`;
 }
 
 async function loadData(page) {
@@ -155,7 +198,6 @@ function renderTable(data) {
     const thead = document.getElementById('data-thead');
     const tbody = document.getElementById('data-tbody');
 
-    // Render header
     thead.innerHTML = '<tr>' + cols.map(c => `<th class="${c.thClass}">${c.header}</th>`).join('') + '</tr>';
 
     if (!data.data.length) {
@@ -171,7 +213,7 @@ function renderTable(data) {
 
     const start = (data.page - 1) * data.per_page + 1;
     const end = Math.min(data.page * data.per_page, data.total);
-    document.getElementById('data-info').textContent = `Showing ${start}-${end} of ${data.total} records`;
+    document.getElementById('data-info').textContent = `Showing ${start}–${end} of ${data.total.toLocaleString()} records`;
 
     renderPagination(data.page, data.pages);
 }
@@ -184,15 +226,12 @@ function renderPagination(page, pages) {
     const activeClass = 'bg-blue-600 text-white border-blue-600';
     const normalClass = 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50';
     const disabledClass = 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed';
-    const dots = `<span class="px-1 text-xs text-gray-400">...</span>`;
+    const dots = `<span class="px-1 text-xs text-gray-400">…</span>`;
 
     // Build page numbers: first 2, around current, last 2
     const pageNums = new Set();
-    // First 2
     for (let i = 1; i <= Math.min(2, pages); i++) pageNums.add(i);
-    // Around current
     for (let i = Math.max(1, page - 1); i <= Math.min(pages, page + 1); i++) pageNums.add(i);
-    // Last 2
     for (let i = Math.max(1, pages - 1); i <= pages; i++) pageNums.add(i);
 
     const sorted = [...pageNums].sort((a, b) => a - b);

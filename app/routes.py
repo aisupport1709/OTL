@@ -1,5 +1,6 @@
+import io
 import os
-from flask import Blueprint, render_template, request, jsonify, current_app
+from flask import Blueprint, render_template, request, jsonify, current_app, send_file
 from werkzeug.utils import secure_filename
 from sqlalchemy import func, extract
 from app import db
@@ -133,6 +134,46 @@ def get_invoice_bookings():
         'pages': pagination.pages,
         'per_page': per_page,
     })
+
+
+@api_bp.route('/invoice-bookings/export', methods=['GET'])
+def export_invoice_bookings():
+    """Export filtered invoice bookings to xlsx."""
+    import pandas as pd
+
+    search = request.args.get('search', '').strip()
+    query = InvoiceBooking.query
+
+    if search:
+        like = f'%{search}%'
+        query = query.filter(
+            db.or_(
+                InvoiceBooking.invoice_no.ilike(like),
+                InvoiceBooking.customer_name.ilike(like),
+                InvoiceBooking.booking_code.ilike(like),
+                InvoiceBooking.booking_master_desc.ilike(like),
+            )
+        )
+
+    query = query.order_by(InvoiceBooking.invoice_date.desc())
+    records = [r.to_dict() for r in query.all()]
+
+    df = pd.DataFrame(records)
+    if 'id' in df.columns:
+        df = df.drop(columns=['id'])
+
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Invoice Bookings')
+    output.seek(0)
+
+    filename = 'invoice_bookings_export.xlsx'
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=filename,
+    )
 
 
 @api_bp.route('/invoice-bookings/delete-all', methods=['DELETE'])
