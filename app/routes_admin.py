@@ -116,6 +116,12 @@ def edit_user(user_id):
     user.set_allowed_apps(allowed_apps)
 
     db.session.commit()
+
+    # If editing the currently logged-in user, refresh their session immediately
+    if user.id == session.get('user_id'):
+        session['allowed_apps'] = user.get_allowed_apps()
+        session['role'] = user.role
+
     flash(f'User {user.username} updated successfully.', 'success')
     return redirect(url_for('admin.list_users'))
 
