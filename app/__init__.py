@@ -30,10 +30,29 @@ def create_app():
     app.register_blueprint(seo_api_bp)
 
     with app.app_context():
+        migrate_db()
         db.create_all()
         seed_data()
 
     return app
+
+
+def migrate_db():
+    """Add columns that were added after the initial schema was created."""
+    from sqlalchemy import text
+    with db.engine.connect() as conn:
+        stmts = [
+            # users — new columns from restructure
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user'",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS allowed_apps TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
+            # remove old columns if they exist (old SHA-256 hashing)
+            "ALTER TABLE users DROP COLUMN IF EXISTS salt",
+        ]
+        for stmt in stmts:
+            conn.execute(text(stmt))
+        conn.commit()
 
 
 def seed_data():
