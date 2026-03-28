@@ -108,7 +108,11 @@
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{ key.created_at.strftime('%Y-%m-%d') if key.created_at else '-' }}</td>
                 <td class="px-6 py-4 text-sm space-x-2">
-                    <button onclick="openEditKey({{ key.id }}, {{ key.get_allowed_apps() | tojson }}, '{{ key.expires_at.strftime('%Y-%m-%dT%H:%M') if key.expires_at else '' }}')"
+                    <button
+                        data-key-id="{{ key.id }}"
+                        data-key-apps="{{ key.get_allowed_apps() | tojson | e }}"
+                        data-key-expiry="{{ key.expires_at.strftime('%Y-%m-%dT%H:%M') if key.expires_at else '' }}"
+                        onclick="openEditKey(this)"
                         class="text-indigo-600 hover:text-indigo-800 font-medium">
                         <i class="bi bi-pencil"></i> Edit
                     </button>
@@ -179,7 +183,10 @@
 <script>
     const allApps = {{ all_apps_json | tojson }};
 
-    function openEditKey(keyId, currentApps, currentExpiry) {
+    function openEditKey(btn) {
+        const keyId = btn.dataset.keyId;
+        const currentApps = JSON.parse(btn.dataset.keyApps);
+        const currentExpiry = btn.dataset.keyExpiry;
         document.getElementById('editKeyForm').action = `/admin/keys/${keyId}/edit`;
         document.getElementById('editExpiresAt').value = currentExpiry;
 
