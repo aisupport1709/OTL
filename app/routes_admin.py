@@ -198,6 +198,36 @@ def add_key():
     return redirect(url_for('admin.list_keys'))
 
 
+@admin_bp.route('/keys/<int:key_id>/edit', methods=['POST'])
+@login_required
+@admin_required
+def edit_key(key_id):
+    """Edit shared key allowed apps and expiry."""
+    key = SharedKey.query.get_or_404(key_id)
+
+    allowed_apps = request.form.getlist('allowed_apps')
+    if not allowed_apps:
+        flash('At least one app must be assigned to the key.', 'danger')
+        return redirect(url_for('admin.list_keys'))
+
+    key.set_allowed_apps(allowed_apps)
+
+    expires_at = request.form.get('expires_at', '').strip()
+    if expires_at:
+        try:
+            from datetime import datetime
+            key.expires_at = datetime.fromisoformat(expires_at)
+        except (ValueError, TypeError):
+            flash('Invalid expiry date format.', 'danger')
+            return redirect(url_for('admin.list_keys'))
+    else:
+        key.expires_at = None
+
+    db.session.commit()
+    flash(f'Shared key #{key_id} updated successfully.', 'success')
+    return redirect(url_for('admin.list_keys'))
+
+
 @admin_bp.route('/keys/<int:key_id>/revoke', methods=['POST'])
 @login_required
 @admin_required
