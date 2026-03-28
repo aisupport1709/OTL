@@ -38,20 +38,42 @@ def create_app():
 
 
 def migrate_db():
-    """Add columns that were added after the initial schema was created."""
-    from sqlalchemy import text
+    """Add columns that were added after the initial schema was created.
+    Works for both SQLite (local) and PostgreSQL (production).
+    """
+    from sqlalchemy import text, inspect
+
+    is_postgres = db.engine.dialect.name == 'postgresql'
+
     with db.engine.connect() as conn:
-        stmts = [
-            # users — new columns from restructure
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user'",
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS allowed_apps TEXT NOT NULL DEFAULT '[]'",
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE",
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
-            # remove old columns if they exist (old SHA-256 hashing)
-            "ALTER TABLE users DROP COLUMN IF EXISTS salt",
-        ]
-        for stmt in stmts:
-            conn.execute(text(stmt))
+        if is_postgres:
+            stmts = [
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS allowed_apps TEXT NOT NULL DEFAULT '[]'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
+                "ALTER TABLE users DROP COLUMN IF EXISTS salt",
+            ]
+            for stmt in stmts:
+                conn.execute(text(stmt))
+        else:
+            # SQLite: check existing columns via inspector, only add if missing
+            inspector = inspect(db.engine)
+            try:
+                existing = {col['name'] for col in inspector.get_columns('users')}
+            except Exception:
+                existing = set()
+
+            sqlite_additions = [
+                ("role", "ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'"),
+                ("allowed_apps", "ALTER TABLE users ADD COLUMN allowed_apps TEXT NOT NULL DEFAULT '[]'"),
+                ("active", "ALTER TABLE users ADD COLUMN active BOOLEAN NOT NULL DEFAULT 1"),
+                ("created_at", "ALTER TABLE users ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+            ]
+            for col_name, stmt in sqlite_additions:
+                if col_name not in existing:
+                    conn.execute(text(stmt))
+
         conn.commit()
 
 
