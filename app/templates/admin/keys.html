@@ -1,0 +1,154 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Manage Shared Keys{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h2 class="text-3xl font-bold text-gray-800">Shared Keys</h2>
+    <p class="text-gray-600 mt-1">Create and manage shared authentication keys</p>
+</div>
+
+<!-- Add Key Form -->
+<div class="bg-white rounded-lg shadow p-6 mb-8">
+    <h3 class="text-lg font-bold text-gray-800 mb-4">Create New Shared Key</h3>
+    <form method="POST" action="{{ url_for('admin.add_key') }}" class="space-y-4">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Key (5 characters)</label>
+                <input type="text" name="key" maxlength="5" required pattern="[A-Za-z0-9!@#$%^&*]{5}"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-center text-lg tracking-widest font-mono"
+                    placeholder="aB3!x">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Expires At (optional)</label>
+                <input type="datetime-local" name="expires_at"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Allowed Apps</label>
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-2">
+                {% if all_apps %}
+                    {% for app in all_apps %}
+                    <div class="flex items-center">
+                        <input type="checkbox" id="app-{{ app.id }}" name="allowed_apps" value="{{ app.id }}"
+                            class="w-4 h-4 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500">
+                        <label for="app-{{ app.id }}" class="ml-2 text-sm text-gray-700">
+                            {{ app.name }} <span class="text-gray-500 text-xs">{{ app.id }}</span>
+                        </label>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <p class="text-sm text-gray-500 italic">No apps available</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg transition">
+            <i class="bi bi-plus-lg"></i> Create Key
+        </button>
+    </form>
+    <div class="mt-3 text-xs text-gray-500 space-y-1">
+        <p><i class="bi bi-info-circle"></i> Key must be exactly 5 characters</p>
+        <p><i class="bi bi-info-circle"></i> Must contain: uppercase, lowercase, digit, and special character (!@#$%^&*)</p>
+    </div>
+</div>
+
+<!-- App Assignment Section -->
+<div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-8">
+    <p class="text-sm text-indigo-800">
+        <i class="bi bi-lightbulb"></i> <strong>When creating a key:</strong> Select at least one app from the list below.
+        Keys can be shared with users to provide access to specific applications.
+    </p>
+</div>
+
+<!-- Keys Table -->
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="w-full">
+        <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Key ID</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Allowed Apps</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Expires At</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Created</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            {% for key in keys %}
+            <tr class="hover:bg-gray-50 transition">
+                <td class="px-6 py-4 text-sm font-mono text-gray-800">#{{ key.id }}</td>
+                <td class="px-6 py-4 text-sm">
+                    {% set apps = key.get_allowed_apps() %}
+                    {% if apps %}
+                        <span class="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded mr-1">
+                            {{ ', '.join(apps) }}
+                        </span>
+                    {% else %}
+                        <span class="text-gray-400 italic">None</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600">
+                    {% if key.expires_at %}
+                        {{ key.expires_at.strftime('%Y-%m-%d %H:%M') }}
+                    {% else %}
+                        <span class="text-gray-400">Never</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 text-sm">
+                    {% if key.active and key.is_valid() %}
+                    <span class="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Valid</span>
+                    {% elif key.active %}
+                    <span class="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Expired</span>
+                    {% else %}
+                    <span class="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">Revoked</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ key.created_at.strftime('%Y-%m-%d') if key.created_at else '-' }}</td>
+                <td class="px-6 py-4 text-sm">
+                    {% if key.active %}
+                    <form method="POST" action="{{ url_for('admin.revoke_key', key_id=key.id) }}" style="display: inline;">
+                        <button type="submit" class="text-red-600 hover:text-red-800 font-medium"
+                            onclick="return confirm('Revoke this key? It will no longer work.')">
+                            <i class="bi bi-trash"></i> Revoke
+                        </button>
+                    </form>
+                    {% else %}
+                    <span class="text-gray-400 text-sm">Revoked</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if not keys %}
+    <div class="text-center py-8 text-gray-500">
+        <i class="bi bi-inbox text-3xl mb-2 block"></i>
+        No shared keys yet
+    </div>
+    {% endif %}
+</div>
+
+<!-- App List for Reference -->
+<div class="mt-8 bg-gray-50 rounded-lg p-6">
+    <h4 class="font-bold text-gray-800 mb-4">Available Apps</h4>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for app in all_apps %}
+        <div class="bg-white border border-gray-200 rounded p-4">
+            <p class="font-medium text-gray-800">{{ app.name }}</p>
+            <p class="text-xs text-gray-600 mt-1"><code>{{ app.id }}</code></p>
+            <p class="text-xs text-gray-500 mt-1">{{ app.path }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+    const allApps = {{ all_apps_json | tojson }};
+
+    // This would need to be integrated into the form to show app checkboxes
+    // For now, adding this as a note - the form should include checkboxes for app selection
+</script>
+{% endblock %}

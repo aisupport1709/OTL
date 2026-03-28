@@ -40,7 +40,7 @@
 <script>
 async function loadSettings() {
     try {
-        const resp = await fetch('/api/settings');
+        const resp = await fetch('/otl/api/settings');
         const data = await resp.json();
         document.getElementById('local-currency').value = data.local_currency || 'VND';
     } catch (err) {
@@ -58,7 +58,7 @@ async function saveCurrency() {
     btn.textContent = 'Saving...';
 
     try {
-        const resp = await fetch('/api/settings', {
+        const resp = await fetch('/otl/api/settings', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ local_currency: value }),

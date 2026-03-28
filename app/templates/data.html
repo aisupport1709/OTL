@@ -174,7 +174,7 @@ function exportData() {
     const search = document.getElementById('search-input').value.trim();
     const params = new URLSearchParams();
     if (search) params.set('search', search);
-    window.location.href = `/api/invoice-bookings/export?${params}`;
+    window.location.href = `/otl/api/invoice-bookings/export?${params}`;
 }
 
 async function loadData(page) {
@@ -183,7 +183,7 @@ async function loadData(page) {
     const params = new URLSearchParams({ page, per_page: 50, search });
 
     try {
-        const resp = await fetch(`/api/invoice-bookings?${params}`);
+        const resp = await fetch(`/otl/api/invoice-bookings?${params}`);
         const data = await resp.json();
         renderTable(data);
     } catch (err) {

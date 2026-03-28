@@ -1,0 +1,138 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Manage Apps{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h2 class="text-3xl font-bold text-gray-800">Apps</h2>
+    <p class="text-gray-600 mt-1">Manage the registered application registry</p>
+</div>
+
+<!-- Add App Form -->
+<div class="bg-white rounded-lg shadow p-6 mb-8">
+    <h3 class="text-lg font-bold text-gray-800 mb-4">Register New App</h3>
+    <form method="POST" action="{{ url_for('admin.add_app') }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">App ID</label>
+            <input type="text" name="id" required pattern="[a-z0-9-]+" placeholder="e.g., otl"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">App Name</label>
+            <input type="text" name="name" required placeholder="e.g., OTL App"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">App Path</label>
+            <input type="text" name="path" required placeholder="e.g., /otl/"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg transition">
+            <i class="bi bi-plus-lg"></i> Add App
+        </button>
+    </form>
+    <div class="mt-3 text-xs text-gray-500">
+        <p><i class="bi bi-info-circle"></i> App ID must be lowercase alphanumeric with hyphens</p>
+    </div>
+</div>
+
+<!-- Apps Table -->
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="w-full">
+        <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">ID</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Name</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Path</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Description</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            {% for app in apps %}
+            <tr class="hover:bg-gray-50 transition">
+                <td class="px-6 py-4 text-sm font-mono font-bold text-indigo-600">{{ app.id }}</td>
+                <td class="px-6 py-4 text-sm font-medium text-gray-800">{{ app.name }}</td>
+                <td class="px-6 py-4 text-sm font-mono text-gray-600">{{ app.path }}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">
+                    {% if app.description %}
+                        {{ app.description }}
+                    {% else %}
+                        <span class="text-gray-400 italic">-</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 text-sm">
+                    <button onclick="openEditForm('{{ app.id }}')" class="text-indigo-600 hover:text-indigo-800 font-medium">
+                        <i class="bi bi-pencil"></i> Edit
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if not apps %}
+    <div class="text-center py-8 text-gray-500">
+        <i class="bi bi-inbox text-3xl mb-2 block"></i>
+        No apps registered yet
+    </div>
+    {% endif %}
+</div>
+
+<!-- Edit App Modal -->
+<div id="editModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-lg font-bold text-gray-800 mb-4">Edit App</h3>
+        <form method="POST" id="editForm">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">App ID</label>
+                <input type="text" id="editId" disabled
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">App Name</label>
+                <input type="text" name="name" id="editName" required
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">App Path</label>
+                <input type="text" name="path" id="editPath" required
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea name="description" id="editDescription" rows="3"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+            </div>
+            <div class="flex gap-3">
+                <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg">
+                    Save
+                </button>
+                <button type="button" onclick="closeEditForm()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 rounded-lg">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const appsData = {{ apps_json | tojson }};
+
+    function openEditForm(appId) {
+        const app = appsData.find(a => a.id === appId);
+        if (!app) return;
+
+        document.getElementById('editForm').action = `/admin/apps/${appId}/edit`;
+        document.getElementById('editId').value = app.id;
+        document.getElementById('editName').value = app.name;
+        document.getElementById('editPath').value = app.path;
+        document.getElementById('editDescription').value = app.description || '';
+
+        document.getElementById('editModal').classList.remove('hidden');
+    }
+
+    function closeEditForm() {
+        document.getElementById('editModal').classList.add('hidden');
+    }
+</script>
+{% endblock %}

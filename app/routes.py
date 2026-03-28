@@ -7,10 +7,10 @@ from app import db
 from app.models.invoice_booking import InvoiceBooking
 from app.models.app_setting import AppSetting
 from app.services.excel_import import import_invoice_booking_excel, import_invoice_booking_google_sheet
-from app.routes_auth import login_required
+from app.routes_auth import login_required, app_access_required
 
-main_bp = Blueprint('main', __name__)
-api_bp = Blueprint('api', __name__)
+main_bp = Blueprint('main', __name__, url_prefix='/otl')
+api_bp = Blueprint('api', __name__, url_prefix='/otl/api')
 
 ALLOWED_EXTENSIONS = {'xlsx', 'xls'}
 
@@ -23,24 +23,28 @@ def allowed_file(filename):
 
 @main_bp.route('/')
 @login_required
+@app_access_required('otl')
 def dashboard():
     return render_template('dashboard.html')
 
 
 @main_bp.route('/import')
 @login_required
+@app_access_required('otl')
 def import_page():
     return render_template('import.html')
 
 
 @main_bp.route('/data')
 @login_required
+@app_access_required('otl')
 def data_page():
     return render_template('data.html')
 
 
 @main_bp.route('/settings')
 @login_required
+@app_access_required('otl')
 def settings_page():
     return render_template('settings.html')
 

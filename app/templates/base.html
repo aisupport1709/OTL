@@ -32,34 +32,49 @@
             </div>
             <ul class="flex-1 mt-2">
                 <li>
-                    <a href="/" class="flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
-                        {% if request.path == '/' %}border-blue-400 bg-blue-400/10 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}">
+                    <a href="{{ url_for('main.dashboard') }}" class="flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
+                        {% if request.path == '/otl/' or request.path == '/otl' %}border-blue-400 bg-blue-400/10 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}">
                         <i class="bi bi-speedometer2 text-base"></i> Dashboard
                     </a>
                 </li>
                 <li>
-                    <a href="/import" class="flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
-                        {% if request.path == '/import' %}border-blue-400 bg-blue-400/10 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}">
+                    <a href="{{ url_for('main.import_page') }}" class="flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
+                        {% if request.path == '/otl/import' %}border-blue-400 bg-blue-400/10 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}">
                         <i class="bi bi-cloud-upload text-base"></i> Import Data
                     </a>
                 </li>
                 <li>
-                    <a href="/data" class="flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
-                        {% if request.path == '/data' %}border-blue-400 bg-blue-400/10 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}">
+                    <a href="{{ url_for('main.data_page') }}" class="flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
+                        {% if request.path == '/otl/data' %}border-blue-400 bg-blue-400/10 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}">
                         <i class="bi bi-table text-base"></i> Invoice Data
                     </a>
                 </li>
                 <li>
-                    <a href="/settings" class="flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
-                        {% if request.path == '/settings' %}border-blue-400 bg-blue-400/10 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}">
+                    <a href="{{ url_for('main.settings_page') }}" class="flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
+                        {% if request.path == '/otl/settings' %}border-blue-400 bg-blue-400/10 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}">
                         <i class="bi bi-gear text-base"></i> Settings
                     </a>
                 </li>
+                {% if session.get('role') == 'admin' %}
+                <li class="border-t border-white/10 mt-2">
+                    <a href="/admin" class="flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
+                        {% if request.path.startswith('/admin') %}border-indigo-400 bg-indigo-400/10 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}">
+                        <i class="bi bi-shield-lock text-base"></i> Admin
+                    </a>
+                </li>
+                {% endif %}
             </ul>
+            <!-- Switch App Button -->
+            <div class="px-3 py-2 border-t border-white/10">
+                <a href="{{ url_for('apps.selector') }}" class="flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all text-center justify-center font-medium">
+                    <i class="bi bi-arrow-left-right"></i> Switch App
+                </a>
+            </div>
+            <!-- User Info & Logout -->
             <div class="px-5 py-3 border-t border-white/10 text-xs text-white/40">
                 <div class="flex items-center justify-between">
                     <span>{{ session.get('display_name', 'User') }}</span>
-                    <a href="/logout" class="text-white/50 hover:text-white transition"><i class="bi bi-box-arrow-right"></i></a>
+                    <a href="{{ url_for('auth.logout') }}" class="text-white/50 hover:text-white transition" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
                 </div>
             </div>
         </nav>

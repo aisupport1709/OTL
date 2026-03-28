@@ -19,3 +19,6 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_FOLDER = os.path.join(BASE_DIR, os.getenv('UPLOAD_FOLDER', 'uploads'))
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max upload
+    # Rate limiter config
+    RATELIMIT_STORAGE_URL = "memory://"
+    RATELIMIT_DEFAULT = "200 per day"

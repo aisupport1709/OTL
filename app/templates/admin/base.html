@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin Panel{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="flex min-h-screen">
+        <!-- Sidebar -->
+        <nav class="w-60 bg-indigo-900 fixed top-0 left-0 h-full text-white flex flex-col z-50 shadow-xl">
+            <div class="px-5 py-4 border-b border-indigo-700">
+                <h1 class="text-lg font-bold tracking-wide flex items-center gap-2">
+                    <i class="bi bi-shield-lock text-indigo-300"></i> Admin Panel
+                </h1>
+            </div>
+            <ul class="flex-1 mt-2">
+                <li>
+                    <a href="{{ url_for('admin.dashboard') }}" class="flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
+                        {% if request.path == '/admin' or request.path == '/admin/' %}border-indigo-300 bg-indigo-700/50 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}">
+                        <i class="bi bi-speedometer2 text-base"></i> Dashboard
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin.list_users') }}" class="flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
+                        {% if request.path == '/admin/users' %}border-indigo-300 bg-indigo-700/50 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}">
+                        <i class="bi bi-people text-base"></i> Users
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin.list_keys') }}" class="flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
+                        {% if request.path == '/admin/keys' %}border-indigo-300 bg-indigo-700/50 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}">
+                        <i class="bi bi-key text-base"></i> Shared Keys
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin.list_apps') }}" class="flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
+                        {% if request.path == '/admin/apps' %}border-indigo-300 bg-indigo-700/50 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}">
+                        <i class="bi bi-boxes text-base"></i> Apps
+                    </a>
+                </li>
+            </ul>
+            <!-- Switch App Button -->
+            <div class="px-3 py-2 border-t border-indigo-700">
+                <a href="{{ url_for('apps.selector') }}" class="flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-all text-center justify-center font-medium">
+                    <i class="bi bi-arrow-left-right"></i> Switch App
+                </a>
+            </div>
+            <!-- User Info & Logout -->
+            <div class="px-5 py-3 border-t border-indigo-700 text-xs text-white/40">
+                <div class="flex items-center justify-between">
+                    <span>{{ session.get('display_name', 'User') }}</span>
+                    <a href="{{ url_for('auth.logout') }}" class="text-white/50 hover:text-white transition"><i class="bi bi-box-arrow-right"></i></a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="ml-60 flex-1 p-6">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="mb-4 p-4 rounded-lg text-sm
+                {% if category == 'danger' %}bg-red-50 text-red-700 border border-red-200
+                {% elif category == 'success' %}bg-green-50 text-green-700 border border-green-200
+                {% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %}">
+                <i class="bi {% if category == 'danger' %}bi-exclamation-circle{% elif category == 'success' %}bi-check-circle{% else %}bi-info-circle{% endif %} mr-2"></i>
+                {{ message }}
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+</body>
+</html>

@@ -115,7 +115,7 @@ document.getElementById('upload-form').addEventListener('submit', async function
     btn.classList.add('opacity-50');
 
     try {
-        const resp = await fetch('/api/upload/invoice-booking', { method: 'POST', body: formData });
+        const resp = await fetch('/otl/api/upload/invoice-booking', { method: 'POST', body: formData });
         const data = await resp.json();
 
         if (resp.ok) {
@@ -156,7 +156,7 @@ async function importGoogleSheet() {
     btn.classList.add('opacity-50');
 
     try {
-        const resp = await fetch('/api/upload/invoice-booking-google', {
+        const resp = await fetch('/otl/api/upload/invoice-booking-google', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url }),
@@ -191,7 +191,7 @@ async function deleteAllData() {
     if (!confirm('Are you sure you want to delete ALL invoice booking data?')) return;
     const result = document.getElementById('delete-result');
     try {
-        const resp = await fetch('/api/invoice-bookings/delete-all', { method: 'DELETE' });
+        const resp = await fetch('/otl/api/invoice-bookings/delete-all', { method: 'DELETE' });
         const data = await resp.json();
         result.innerHTML = `<div class="p-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-sm">${data.message}</div>`;
     } catch (err) {

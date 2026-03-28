@@ -44,7 +44,7 @@ function resetFilters() {
 
 async function loadFilterOptions() {
     try {
-        const resp = await fetch('/api/filters/months');
+        const resp = await fetch('/otl/api/filters/months');
         const months = await resp.json();
         const sel = document.getElementById('filter-month');
         const current = sel.value;
@@ -57,7 +57,7 @@ async function loadFilterOptions() {
 
 async function loadCurrencyOptions() {
     try {
-        const resp = await fetch('/api/kpi/currency-breakdown?' + getFilters());
+        const resp = await fetch('/otl/api/kpi/currency-breakdown?' + getFilters());
         const data = await resp.json();
         availableCurrencies = data.map(d => d.currency).filter(Boolean);
 
@@ -115,7 +115,7 @@ async function loadDashboard() {
     updateFilterBadges();
     // Load settings first so currency label is available
     try {
-        const resp = await fetch('/api/settings');
+        const resp = await fetch('/otl/api/settings');
         const settings = await resp.json();
         localCurrency = settings.local_currency || 'VND';
     } catch (err) {
@@ -138,7 +138,7 @@ async function loadDashboard() {
 
 async function loadKPIs() {
     try {
-        const resp = await fetch(`/api/kpi/summary?${getFilters()}`);
+        const resp = await fetch(`/otl/api/kpi/summary?${getFilters()}`);
         const data = await resp.json();
         const ccy = getSelectedCurrency();
 
@@ -182,7 +182,7 @@ async function loadFtlLtlComparison() {
         if (month) params.set('month', month);
         params.set('currency', getSelectedCurrency());
 
-        const resp = await fetch(`/api/kpi/ftl-ltl-comparison?${params}`);
+        const resp = await fetch(`/otl/api/kpi/ftl-ltl-comparison?${params}`);
         const data = await resp.json();
 
         const ftlData = data.filter(d => d.category === 'FTL');
@@ -238,7 +238,7 @@ async function loadRevenueByMonth() {
         if (category) params.set('category', category);
         params.set('currency', getSelectedCurrency());
 
-        const resp = await fetch(`/api/kpi/revenue-by-month?${params}`);
+        const resp = await fetch(`/otl/api/kpi/revenue-by-month?${params}`);
         const data = await resp.json();
 
         if (charts.revenueMonth) charts.revenueMonth.destroy();
@@ -282,7 +282,7 @@ async function loadRevenueByMonth() {
 
 async function loadTopCustomers() {
     try {
-        const resp = await fetch(`/api/kpi/top-customers?${getFilters()}`);
+        const resp = await fetch(`/otl/api/kpi/top-customers?${getFilters()}`);
         const data = await resp.json();
 
         if (charts.topCustomers) charts.topCustomers.destroy();
@@ -324,7 +324,7 @@ async function loadRevenueByCategory() {
         if (month) params.set('month', month);
         params.set('currency', getSelectedCurrency());
 
-        const resp = await fetch(`/api/kpi/revenue-by-category?${params}`);
+        const resp = await fetch(`/otl/api/kpi/revenue-by-category?${params}`);
         const data = await resp.json();
 
         if (charts.category) charts.category.destroy();
@@ -355,7 +355,7 @@ async function loadRevenueByCategory() {
 
 async function loadRoutes() {
     try {
-        const resp = await fetch(`/api/kpi/revenue-by-location?${getFilters()}`);
+        const resp = await fetch(`/otl/api/kpi/revenue-by-location?${getFilters()}`);
         const data = await resp.json();
 
         if (charts.routes) charts.routes.destroy();
@@ -392,7 +392,7 @@ async function loadRoutes() {
 
 async function loadInvoiceStatus() {
     try {
-        const resp = await fetch(`/api/kpi/invoice-status?${getFilters()}`);
+        const resp = await fetch(`/otl/api/kpi/invoice-status?${getFilters()}`);
         const data = await resp.json();
 
         if (charts.status) charts.status.destroy();
