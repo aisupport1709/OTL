@@ -19,12 +19,15 @@ def create_app():
     from app.routes import main_bp, api_bp
     from app.routes_admin import admin_bp
     from app.routes_apps import apps_bp
+    from app.routes_seo import seo_bp, seo_api_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(apps_bp)
+    app.register_blueprint(seo_bp)
+    app.register_blueprint(seo_api_bp)
 
     with app.app_context():
         db.create_all()
@@ -45,5 +48,8 @@ def seed_data():
 
     if not App.query.get('otl'):
         db.session.add(App(id='otl', name='OTL App', path='/otl/'))
+
+    if not App.query.get('seo'):
+        db.session.add(App(id='seo', name='SEO Scan', path='/seo/'))
 
     db.session.commit()

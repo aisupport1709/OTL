@@ -1,0 +1,230 @@
+{% extends "seo/base.html" %}
+
+{% block title %}Meta Scanner – SEO Scan{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h2 class="text-2xl font-bold text-gray-800">Meta Description Extractor</h2>
+    <p class="text-gray-500 mt-1 text-sm">Check title tags and meta descriptions for any list of URLs</p>
+</div>
+
+<div class="bg-white rounded-xl shadow p-6 mb-6">
+    <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">URLs to scan <span class="text-gray-400">(one per line)</span></label>
+        <textarea id="urlInput" rows="6"
+            class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg font-mono text-sm focus:outline-none focus:border-blue-500 resize-y"
+            placeholder="https://www.google.com&#10;https://github.com&#10;https://example.com"></textarea>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+        <button id="btnProcess" onclick="processUrls()"
+            class="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-wait text-white font-semibold rounded-lg transition text-sm">
+            <i class="bi bi-play-fill"></i> Extract Metadata
+        </button>
+
+        <select id="filterSelect" onchange="filterResults()"
+            class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 focus:outline-none focus:border-blue-500">
+            <option value="all">Show All</option>
+            <option value="found">Found Only</option>
+            <option value="missing">Not Found / Error</option>
+        </select>
+
+        <button id="btnExport" onclick="exportToCSV()"
+            class="hidden px-5 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition text-sm">
+            <i class="bi bi-download"></i> Download CSV
+        </button>
+
+        <button onclick="clearTable()"
+            class="px-5 py-2 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg transition text-sm">
+            <i class="bi bi-x-lg"></i> Clear
+        </button>
+
+        <span id="progressStatus" class="ml-auto text-sm text-gray-500">Ready</span>
+    </div>
+</div>
+
+<!-- Results Table -->
+<div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b-2 border-gray-200">
+                <tr>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600 w-8">#</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600">URL</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600 w-24">Status</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600">Title</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600 w-20">Title Len</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600">Meta Description</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600 w-20">Desc Len</th>
+                </tr>
+            </thead>
+            <tbody id="resultBody">
+            </tbody>
+        </table>
+        <div id="emptyState" class="text-center py-16 text-gray-400">
+            <i class="bi bi-search text-4xl block mb-3"></i>
+            <p>Enter URLs above and click Extract Metadata</p>
+        </div>
+    </div>
+</div>
+
+<!-- Legend -->
+<div class="mt-4 flex flex-wrap gap-4 text-xs text-gray-500">
+    <span><span class="font-bold text-green-600">Green length</span> = within ideal range</span>
+    <span><span class="font-bold text-red-600">Red length</span> = too short or too long</span>
+    <span>Title ideal: 30–60 chars &nbsp;|&nbsp; Description ideal: 70–150 chars</span>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const PROXY_URL = '/seo/api/proxy?url=';
+    let tableData = [];
+
+    async function processUrls() {
+        const input = document.getElementById('urlInput');
+        const urls = input.value.trim().split('\n').map(u => u.trim()).filter(u => u);
+        const btn = document.getElementById('btnProcess');
+        const status = document.getElementById('progressStatus');
+
+        if (!urls.length) return alert('Please enter at least one URL.');
+
+        clearTable();
+        btn.disabled = true;
+        document.getElementById('emptyState').style.display = 'none';
+
+        for (let i = 0; i < urls.length; i++) {
+            let url = urls[i];
+            if (!url.startsWith('http')) url = 'https://' + url;
+
+            status.textContent = `Processing ${i + 1} of ${urls.length}…`;
+            const rowId = `row-${i}`;
+            addRowToTable(i + 1, url, rowId);
+            await fetchMeta(url, rowId, i + 1);
+        }
+
+        status.textContent = `Done — ${urls.length} URL${urls.length > 1 ? 's' : ''} scanned.`;
+        btn.disabled = false;
+        document.getElementById('btnExport').classList.remove('hidden');
+    }
+
+    function addRowToTable(index, url, rowId) {
+        const tbody = document.getElementById('resultBody');
+        const tr = document.createElement('tr');
+        tr.id = rowId;
+        tr.dataset.status = 'loading';
+        tr.className = 'border-b border-gray-100 hover:bg-gray-50 transition';
+        tr.innerHTML = `
+            <td class="px-4 py-3 text-gray-500">${index}</td>
+            <td class="px-4 py-3 max-w-xs"><a href="${url}" target="_blank" class="text-blue-600 hover:underline break-all">${url}</a></td>
+            <td class="px-4 py-3 status-cell"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-gray-200 text-gray-500 animate-pulse">Loading…</span></td>
+            <td class="px-4 py-3 title-cell text-gray-500 max-w-xs">—</td>
+            <td class="px-4 py-3 title-length-cell text-gray-400">—</td>
+            <td class="px-4 py-3 desc-cell text-gray-500 max-w-sm">—</td>
+            <td class="px-4 py-3 desc-length-cell text-gray-400">—</td>
+        `;
+        tbody.appendChild(tr);
+    }
+
+    async function fetchMeta(url, rowId, index) {
+        const tr = document.getElementById(rowId);
+        const statusCell = tr.querySelector('.status-cell');
+        const titleCell = tr.querySelector('.title-cell');
+        const titleLenCell = tr.querySelector('.title-length-cell');
+        const descCell = tr.querySelector('.desc-cell');
+        const descLenCell = tr.querySelector('.desc-length-cell');
+
+        let result = { id: index, url, status: 'Error', title: '', titleLength: 0, description: '', descLength: 0 };
+
+        try {
+            const response = await fetch(PROXY_URL + encodeURIComponent(url));
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            const pageTitle = doc.querySelector('title')?.textContent?.trim() || '';
+            const metaDesc = doc.querySelector('meta[name="description"]')?.getAttribute('content')
+                          || doc.querySelector('meta[property="og:description"]')?.getAttribute('content')
+                          || doc.querySelector('meta[name="twitter:description"]')?.getAttribute('content')
+                          || '';
+
+            const titleLen = pageTitle.length;
+            const descLen = metaDesc.length;
+
+            const titleLenClass = (titleLen >= 30 && titleLen <= 60) ? 'font-bold text-green-600' : 'font-bold text-red-600';
+            const descLenClass  = (descLen  >= 70 && descLen  <= 150) ? 'font-bold text-green-600' : 'font-bold text-red-600';
+
+            if (metaDesc.trim()) {
+                statusCell.innerHTML = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Found</span>';
+                tr.dataset.status = 'found';
+                result.status = 'Found';
+            } else {
+                statusCell.innerHTML = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">Missing</span>';
+                tr.dataset.status = 'missing';
+                result.status = 'Not Found';
+            }
+
+            titleCell.textContent = pageTitle || '—';
+            titleLenCell.innerHTML = titleLen ? `<span class="${titleLenClass}">${titleLen}</span>` : '—';
+            descCell.textContent = metaDesc || '—';
+            descLenCell.innerHTML = descLen ? `<span class="${descLenClass}">${descLen}</span>` : '—';
+
+            result.title = pageTitle;
+            result.titleLength = titleLen;
+            result.description = metaDesc;
+            result.descLength = descLen;
+
+        } catch (err) {
+            console.error(err);
+            statusCell.innerHTML = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">Error</span>';
+            descCell.textContent = 'Blocked or unreachable';
+            tr.dataset.status = 'error';
+            result.status = 'Error';
+            result.description = 'Fetch Failed';
+        }
+
+        tableData.push(result);
+        filterResults();
+    }
+
+    function filterResults() {
+        const filter = document.getElementById('filterSelect').value;
+        document.querySelectorAll('#resultBody tr').forEach(row => {
+            const s = row.dataset.status;
+            if (filter === 'all') row.style.display = '';
+            else if (filter === 'found') row.style.display = s === 'found' ? '' : 'none';
+            else row.style.display = (s === 'missing' || s === 'error') ? '' : 'none';
+        });
+    }
+
+    function exportToCSV() {
+        if (!tableData.length) return;
+        const headers = ['ID', 'URL', 'Status', 'Title', 'Title Length', 'Meta Description', 'Description Length'];
+        const rows = tableData.map(r => [
+            r.id,
+            `"${r.url.replace(/"/g, '""')}"`,
+            r.status,
+            `"${r.title.replace(/"/g, '""')}"`,
+            r.titleLength,
+            `"${r.description.replace(/"/g, '""')}"`,
+            r.descLength
+        ].join(','));
+
+        const csv = [headers.join(','), ...rows].join('\n');
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+        a.download = `seo_scan_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+    }
+
+    function clearTable() {
+        document.getElementById('resultBody').innerHTML = '';
+        tableData = [];
+        document.getElementById('btnExport').classList.add('hidden');
+        document.getElementById('progressStatus').textContent = 'Ready';
+        document.getElementById('emptyState').style.display = '';
+    }
+</script>
+{% endblock %}
