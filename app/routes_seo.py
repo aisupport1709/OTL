@@ -1,4 +1,3 @@
-import requests
 from urllib.parse import urlparse
 from flask import Blueprint, render_template, request, Response
 from app.routes_auth import login_required, app_access_required
@@ -65,6 +64,7 @@ def proxy():
         return Response('URL not allowed', status=403)
 
     try:
+        import requests
         resp = requests.get(
             url,
             headers=FETCH_HEADERS,
