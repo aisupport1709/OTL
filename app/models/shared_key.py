@@ -30,3 +30,10 @@ class SharedKey(db.Model):
 
     def set_allowed_apps(self, apps_list):
         self.allowed_apps = json.dumps(apps_list)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'allowed_apps': self.allowed_apps,
+            'expires_at': self.expires_at.strftime('%Y-%m-%dT%H:%M') if self.expires_at else '',
+        }

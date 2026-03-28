@@ -146,6 +146,7 @@ def list_keys():
     return render_template('admin/keys.html',
                            keys=keys,
                            all_apps=all_apps,
+                           keys_json=[k.to_dict() for k in keys],
                            all_apps_json=[a.to_dict() for a in all_apps])
 
 
