@@ -48,7 +48,7 @@
                     class="group relative bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden">
                     <div class="p-8 text-center">
                         <div class="mb-4 text-5xl">
-                            <i class="bi bi-app text-blue-500 group-hover:text-blue-600 transition"></i>
+                            <i class="bi {{ app.icon or 'bi-app' }} text-blue-500 group-hover:text-blue-600 transition"></i>
                         </div>
                         <h3 class="text-xl font-bold text-gray-800 group-hover:text-blue-600 transition">{{ app.name }}</h3>
                         <p class="text-sm text-gray-500 mt-2">{{ app.description or app.id }}</p>

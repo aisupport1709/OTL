@@ -53,8 +53,8 @@ def validate_password(pw):
 
 
 def validate_key(key):
-    """Validate shared key: exactly 5 characters and meets complexity rules"""
-    return len(key) == 5 and validate_password(key)
+    """Validate shared key: 5–8 characters and meets complexity rules"""
+    return 5 <= len(key) <= 8 and validate_password(key)
 
 
 def get_safe_redirect(redirect_param, allowed_apps):

@@ -8,6 +8,7 @@ class App(db.Model):
     name = db.Column(db.String(200), nullable=False)
     path = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
+    icon = db.Column(db.String(100), nullable=True)  # Bootstrap icon class e.g. "bi-bar-chart-line-fill"
 
     def to_dict(self):
         return {
@@ -15,4 +16,5 @@ class App(db.Model):
             'name': self.name,
             'path': self.path,
             'description': self.description,
+            'icon': self.icon or 'bi-app',
         }

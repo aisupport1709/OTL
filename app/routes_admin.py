@@ -19,8 +19,8 @@ def validate_password(pw):
 
 
 def validate_key(key):
-    """Validate shared key: exactly 5 characters and meets complexity rules"""
-    return len(key) == 5 and validate_password(key)
+    """Validate shared key: 5–8 characters and meets complexity rules"""
+    return 5 <= len(key) <= 8 and validate_password(key)
 
 
 # ─── Dashboard ────────────────────────────────────────────────────────
@@ -270,6 +270,7 @@ def add_app():
     app_name = request.form.get('name', '').strip()
     app_path = request.form.get('path', '').strip()
     description = request.form.get('description', '').strip()
+    icon = request.form.get('icon', '').strip() or None
 
     # Validate inputs
     if not app_id or not app_name or not app_path:
@@ -281,7 +282,7 @@ def add_app():
         return redirect(url_for('admin.list_apps'))
 
     # Create app
-    app = App(id=app_id, name=app_name, path=app_path, description=description or None)
+    app = App(id=app_id, name=app_name, path=app_path, description=description or None, icon=icon)
     db.session.add(app)
     db.session.commit()
 
@@ -299,6 +300,7 @@ def edit_app(app_id):
     app.name = request.form.get('name', app.name).strip()
     app.path = request.form.get('path', app.path).strip()
     app.description = request.form.get('description', '').strip() or None
+    app.icon = request.form.get('icon', '').strip() or None
 
     db.session.commit()
     flash(f'App {app_id} updated successfully.', 'success')

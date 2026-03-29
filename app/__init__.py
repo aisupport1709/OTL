@@ -53,26 +53,32 @@ def migrate_db():
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE",
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
                 "ALTER TABLE users DROP COLUMN IF EXISTS salt",
+                "ALTER TABLE apps ADD COLUMN IF NOT EXISTS icon VARCHAR(100)",
             ]
             for stmt in stmts:
                 conn.execute(text(stmt))
         else:
             # SQLite: check existing columns via inspector, only add if missing
             inspector = inspect(db.engine)
-            try:
-                existing = {col['name'] for col in inspector.get_columns('users')}
-            except Exception:
-                existing = set()
 
-            sqlite_additions = [
+            def add_missing(table, additions):
+                try:
+                    existing = {col['name'] for col in inspector.get_columns(table)}
+                except Exception:
+                    existing = set()
+                for col_name, stmt in additions:
+                    if col_name not in existing:
+                        conn.execute(text(stmt))
+
+            add_missing('users', [
                 ("role", "ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'"),
                 ("allowed_apps", "ALTER TABLE users ADD COLUMN allowed_apps TEXT NOT NULL DEFAULT '[]'"),
                 ("active", "ALTER TABLE users ADD COLUMN active BOOLEAN NOT NULL DEFAULT 1"),
                 ("created_at", "ALTER TABLE users ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
-            ]
-            for col_name, stmt in sqlite_additions:
-                if col_name not in existing:
-                    conn.execute(text(stmt))
+            ])
+            add_missing('apps', [
+                ("icon", "ALTER TABLE apps ADD COLUMN icon VARCHAR(100)"),
+            ])
 
         conn.commit()
 
@@ -84,13 +90,17 @@ def seed_data():
     if not User.query.filter_by(username='nguyenanhlinh').first():
         u = User(username='nguyenanhlinh', role='admin', active=True)
         u.set_password('123456@abc')
-        u.set_allowed_apps(['otl'])
+        u.set_allowed_apps(['otl', 'seo'])
         db.session.add(u)
 
     if not App.query.get('otl'):
-        db.session.add(App(id='otl', name='OTL App', path='/otl/'))
+        db.session.add(App(id='otl', name='OTL App', path='/otl/', icon='bi-bar-chart-line-fill'))
+    else:
+        App.query.get('otl').icon = App.query.get('otl').icon or 'bi-bar-chart-line-fill'
 
     if not App.query.get('seo'):
-        db.session.add(App(id='seo', name='SEO Scan', path='/seo/'))
+        db.session.add(App(id='seo', name='SEO Scan', path='/seo/', icon='bi-search'))
+    else:
+        App.query.get('seo').icon = App.query.get('seo').icon or 'bi-search'
 
     db.session.commit()

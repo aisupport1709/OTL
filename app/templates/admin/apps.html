@@ -11,7 +11,7 @@
 <!-- Add App Form -->
 <div class="bg-white rounded-lg shadow p-6 mb-8">
     <h3 class="text-lg font-bold text-gray-800 mb-4">Register New App</h3>
-    <form method="POST" action="{{ url_for('admin.add_app') }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+    <form method="POST" action="{{ url_for('admin.add_app') }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">App ID</label>
             <input type="text" name="id" required pattern="[a-z0-9-]+" placeholder="e.g., otl"
@@ -27,12 +27,21 @@
             <input type="text" name="path" required placeholder="e.g., /otl/"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
         </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Icon <span class="text-gray-400 font-normal">(Bootstrap icon class)</span></label>
+            <div class="flex gap-2 items-center">
+                <input type="text" name="icon" id="addIconInput" placeholder="bi-app"
+                    class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                    oninput="document.getElementById('addIconPreview').className='bi ' + this.value">
+                <i id="addIconPreview" class="bi bi-app text-2xl text-indigo-500"></i>
+            </div>
+        </div>
         <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg transition">
             <i class="bi bi-plus-lg"></i> Add App
         </button>
     </form>
     <div class="mt-3 text-xs text-gray-500">
-        <p><i class="bi bi-info-circle"></i> App ID must be lowercase alphanumeric with hyphens</p>
+        <p><i class="bi bi-info-circle"></i> App ID must be lowercase alphanumeric with hyphens. Icon: any <a href="https://icons.getbootstrap.com" target="_blank" class="underline text-indigo-600">Bootstrap Icon</a> class name.</p>
     </div>
 </div>
 
@@ -41,6 +50,7 @@
     <table class="w-full">
         <thead class="bg-gray-50 border-b border-gray-200">
             <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Icon</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">ID</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Name</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Path</th>
@@ -51,6 +61,9 @@
         <tbody class="divide-y divide-gray-200">
             {% for app in apps %}
             <tr class="hover:bg-gray-50 transition">
+                <td class="px-6 py-4 text-center text-2xl text-indigo-500">
+                    <i class="bi {{ app.icon or 'bi-app' }}"></i>
+                </td>
                 <td class="px-6 py-4 text-sm font-mono font-bold text-indigo-600">{{ app.id }}</td>
                 <td class="px-6 py-4 text-sm font-medium text-gray-800">{{ app.name }}</td>
                 <td class="px-6 py-4 text-sm font-mono text-gray-600">{{ app.path }}</td>
@@ -99,8 +112,17 @@
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
             </div>
             <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Icon <span class="text-gray-400 font-normal">(Bootstrap icon class)</span></label>
+                <div class="flex gap-2 items-center">
+                    <input type="text" name="icon" id="editIcon" placeholder="bi-app"
+                        class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                        oninput="document.getElementById('editIconPreview').className='bi ' + this.value">
+                    <i id="editIconPreview" class="bi bi-app text-2xl text-indigo-500"></i>
+                </div>
+            </div>
+            <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea name="description" id="editDescription" rows="3"
+                <textarea name="description" id="editDescription" rows="2"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
             </div>
             <div class="flex gap-3">
@@ -127,6 +149,9 @@
         document.getElementById('editName').value = app.name;
         document.getElementById('editPath').value = app.path;
         document.getElementById('editDescription').value = app.description || '';
+        const icon = app.icon || 'bi-app';
+        document.getElementById('editIcon').value = icon;
+        document.getElementById('editIconPreview').className = 'bi ' + icon;
 
         document.getElementById('editModal').classList.remove('hidden');
     }
