@@ -22,12 +22,28 @@
             <i class="bi bi-play-fill"></i> Extract Metadata
         </button>
 
+        <button id="btnRetryErrors" onclick="retryErrors()" style="display:none"
+            class="px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition text-sm">
+            <i class="bi bi-arrow-clockwise"></i> Retry Errors
+        </button>
+
         <select id="filterSelect" onchange="filterResults()"
             class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 focus:outline-none focus:border-blue-500">
             <option value="all">Show All</option>
             <option value="found">Found Only</option>
             <option value="missing">Not Found / Error</option>
         </select>
+
+        <div class="flex items-center gap-2 text-sm text-gray-600">
+            <label>Delay:</label>
+            <select id="delaySelect" class="px-2 py-1.5 border-2 border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                <option value="0">None</option>
+                <option value="300" selected>300 ms</option>
+                <option value="500">500 ms</option>
+                <option value="1000">1 s</option>
+                <option value="2000">2 s</option>
+            </select>
+        </div>
 
         <button id="btnExport" onclick="exportToCSV()"
             class="hidden px-5 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition text-sm">
@@ -56,6 +72,7 @@
                     <th class="px-4 py-3 text-left font-semibold text-gray-600 w-20">Title Len</th>
                     <th class="px-4 py-3 text-left font-semibold text-gray-600">Meta Description</th>
                     <th class="px-4 py-3 text-left font-semibold text-gray-600 w-20">Desc Len</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600 w-10"></th>
                 </tr>
             </thead>
             <tbody id="resultBody">
@@ -73,39 +90,123 @@
     <span><span class="font-bold text-green-600">Green length</span> = within ideal range</span>
     <span><span class="font-bold text-red-600">Red length</span> = too short or too long</span>
     <span>Title ideal: 30–60 chars &nbsp;|&nbsp; Description ideal: 70–150 chars</span>
+    <span class="text-gray-400">Hover the <span class="bg-yellow-100 text-yellow-700 px-1 rounded font-bold">Error</span> badge to see error detail</span>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
     const PROXY_URL = '/seo/api/proxy?url=';
-    let tableData = [];
+    let tableData = [];   // { id, url, status, title, titleLength, description, descLength, error }
+    let scanning = false;
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
 
     async function processUrls() {
         const input = document.getElementById('urlInput');
         const urls = input.value.trim().split('\n').map(u => u.trim()).filter(u => u);
-        const btn = document.getElementById('btnProcess');
-        const status = document.getElementById('progressStatus');
 
         if (!urls.length) return alert('Please enter at least one URL.');
 
         clearTable();
-        btn.disabled = true;
+        await runScan(urls, 1);
+    }
+
+    async function retryErrors() {
+        const errorRows = [...document.querySelectorAll('#resultBody tr[data-status="error"]')];
+        if (!errorRows.length) return;
+
+        const urls = errorRows.map(tr => tr.dataset.url);
+        const indices = errorRows.map(tr => parseInt(tr.dataset.index));
+
+        setScanning(true);
+        document.getElementById('btnRetryErrors').style.display = 'none';
+        const delay = parseInt(document.getElementById('delaySelect').value);
+        const status = document.getElementById('progressStatus');
+
+        for (let i = 0; i < urls.length; i++) {
+            status.textContent = `Retrying ${i + 1} of ${urls.length}…`;
+            const rowId = `row-${indices[i] - 1}`;
+            // Reset row to loading state
+            const tr = document.getElementById(rowId);
+            tr.dataset.status = 'loading';
+            tr.querySelector('.status-cell').innerHTML =
+                '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-gray-200 text-gray-500 animate-pulse">Loading…</span>';
+            tr.querySelector('.title-cell').textContent = '—';
+            tr.querySelector('.title-length-cell').textContent = '—';
+            tr.querySelector('.desc-cell').textContent = '—';
+            tr.querySelector('.desc-length-cell').textContent = '—';
+
+            // Remove old tableData entry for this index
+            const idx = tableData.findIndex(r => r.id === indices[i]);
+            if (idx !== -1) tableData.splice(idx, 1);
+
+            await fetchMeta(urls[i], rowId, indices[i]);
+            if (delay > 0 && i < urls.length - 1) await sleep(delay);
+        }
+
+        status.textContent = `Retry done.`;
+        setScanning(false);
+        updateRetryButton();
+    }
+
+    async function refreshRow(index) {
+        const rowId = `row-${index - 1}`;
+        const tr = document.getElementById(rowId);
+        if (!tr) return;
+
+        const url = tr.dataset.url;
+        tr.dataset.status = 'loading';
+        tr.querySelector('.status-cell').innerHTML =
+            '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-gray-200 text-gray-500 animate-pulse">Loading…</span>';
+        tr.querySelector('.title-cell').textContent = '—';
+        tr.querySelector('.title-length-cell').textContent = '—';
+        tr.querySelector('.desc-cell').textContent = '—';
+        tr.querySelector('.desc-length-cell').textContent = '—';
+        tr.querySelector('.refresh-btn').disabled = true;
+
+        const idx = tableData.findIndex(r => r.id === index);
+        if (idx !== -1) tableData.splice(idx, 1);
+
+        await fetchMeta(url, rowId, index);
+        tr.querySelector('.refresh-btn').disabled = false;
+        updateRetryButton();
+    }
+
+    async function runScan(urls, startIndex) {
+        setScanning(true);
+        const delay = parseInt(document.getElementById('delaySelect').value);
+        const status = document.getElementById('progressStatus');
+
         document.getElementById('emptyState').style.display = 'none';
 
         for (let i = 0; i < urls.length; i++) {
             let url = urls[i];
             if (!url.startsWith('http')) url = 'https://' + url;
 
+            const index = startIndex + i;
             status.textContent = `Processing ${i + 1} of ${urls.length}…`;
-            const rowId = `row-${i}`;
-            addRowToTable(i + 1, url, rowId);
-            await fetchMeta(url, rowId, i + 1);
+            const rowId = `row-${index - 1}`;
+            addRowToTable(index, url, rowId);
+            await fetchMeta(url, rowId, index);
+
+            if (delay > 0 && i < urls.length - 1) await sleep(delay);
         }
 
-        status.textContent = `Done — ${urls.length} URL${urls.length > 1 ? 's' : ''} scanned.`;
-        btn.disabled = false;
+        status.textContent = `Done — ${urls.length} URL${urls.length !== 1 ? 's' : ''} scanned.`;
+        setScanning(false);
         document.getElementById('btnExport').classList.remove('hidden');
+        updateRetryButton();
+    }
+
+    function setScanning(active) {
+        scanning = active;
+        document.getElementById('btnProcess').disabled = active;
+    }
+
+    function updateRetryButton() {
+        const hasErrors = document.querySelectorAll('#resultBody tr[data-status="error"]').length > 0;
+        document.getElementById('btnRetryErrors').style.display = hasErrors ? '' : 'none';
     }
 
     function addRowToTable(index, url, rowId) {
@@ -113,15 +214,22 @@
         const tr = document.createElement('tr');
         tr.id = rowId;
         tr.dataset.status = 'loading';
+        tr.dataset.url = url;
+        tr.dataset.index = index;
         tr.className = 'border-b border-gray-100 hover:bg-gray-50 transition';
         tr.innerHTML = `
             <td class="px-4 py-3 text-gray-500">${index}</td>
-            <td class="px-4 py-3 max-w-xs"><a href="${url}" target="_blank" class="text-blue-600 hover:underline break-all">${url}</a></td>
+            <td class="px-4 py-3 max-w-xs"><a href="${escHtml(url)}" target="_blank" class="text-blue-600 hover:underline break-all">${escHtml(url)}</a></td>
             <td class="px-4 py-3 status-cell"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-gray-200 text-gray-500 animate-pulse">Loading…</span></td>
             <td class="px-4 py-3 title-cell text-gray-500 max-w-xs">—</td>
             <td class="px-4 py-3 title-length-cell text-gray-400">—</td>
             <td class="px-4 py-3 desc-cell text-gray-500 max-w-sm">—</td>
             <td class="px-4 py-3 desc-length-cell text-gray-400">—</td>
+            <td class="px-4 py-3">
+                <button class="refresh-btn text-gray-400 hover:text-blue-600 transition" title="Refresh this row" onclick="refreshRow(${index})">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </td>
         `;
         tbody.appendChild(tr);
     }
@@ -134,12 +242,18 @@
         const descCell = tr.querySelector('.desc-cell');
         const descLenCell = tr.querySelector('.desc-length-cell');
 
-        let result = { id: index, url, status: 'Error', title: '', titleLength: 0, description: '', descLength: 0 };
+        let result = { id: index, url, status: 'Error', title: '', titleLength: 0, description: '', descLength: 0, error: '' };
 
         try {
             const response = await fetch(PROXY_URL + encodeURIComponent(url));
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
+            if (!response.ok) {
+                // Read error detail from proxy response body
+                const errText = await response.text();
+                throw new Error(errText || `Proxy error ${response.status}`);
+            }
+
+            const targetStatus = response.headers.get('X-Target-Status') || '200';
             const html = await response.text();
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
@@ -152,7 +266,6 @@
 
             const titleLen = pageTitle.length;
             const descLen = metaDesc.length;
-
             const titleLenClass = (titleLen >= 30 && titleLen <= 60) ? 'font-bold text-green-600' : 'font-bold text-red-600';
             const descLenClass  = (descLen  >= 70 && descLen  <= 150) ? 'font-bold text-green-600' : 'font-bold text-red-600';
 
@@ -164,6 +277,10 @@
                 statusCell.innerHTML = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">Missing</span>';
                 tr.dataset.status = 'missing';
                 result.status = 'Not Found';
+                // Warn if target returned non-200
+                if (targetStatus !== '200') {
+                    statusCell.querySelector('span').title = `Target returned HTTP ${targetStatus}`;
+                }
             }
 
             titleCell.textContent = pageTitle || '—';
@@ -177,16 +294,34 @@
             result.descLength = descLen;
 
         } catch (err) {
-            console.error(err);
-            statusCell.innerHTML = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">Error</span>';
-            descCell.textContent = 'Blocked or unreachable';
+            const errMsg = err.message || 'Unknown error';
+            // Tooltip on the badge shows the full error
+            statusCell.innerHTML = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700 cursor-help" title="${escAttr(errMsg)}">Error ⓘ</span>`;
+            descCell.textContent = shortError(errMsg);
             tr.dataset.status = 'error';
             result.status = 'Error';
-            result.description = 'Fetch Failed';
+            result.error = errMsg;
+            result.description = errMsg;
         }
 
         tableData.push(result);
         filterResults();
+    }
+
+    // Shorten long error for the cell, full detail goes in tooltip
+    function shortError(msg) {
+        if (msg.includes('timed out') || msg.includes('Timed out')) return 'Timed out';
+        if (msg.includes('DNS') || msg.includes('not found')) return 'DNS error';
+        if (msg.includes('redirects')) return 'Too many redirects';
+        if (msg.includes('Connection')) return 'Connection error';
+        return msg.length > 60 ? msg.slice(0, 57) + '…' : msg;
+    }
+
+    function escHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function escAttr(s) {
+        return s.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function filterResults() {
@@ -201,20 +336,21 @@
 
     function exportToCSV() {
         if (!tableData.length) return;
-        const headers = ['ID', 'URL', 'Status', 'Title', 'Title Length', 'Meta Description', 'Description Length'];
+        const headers = ['ID', 'URL', 'Status', 'Title', 'Title Length', 'Meta Description', 'Description Length', 'Error'];
         const rows = tableData.map(r => [
             r.id,
             `"${r.url.replace(/"/g, '""')}"`,
             r.status,
-            `"${r.title.replace(/"/g, '""')}"`,
+            `"${(r.title||'').replace(/"/g, '""')}"`,
             r.titleLength,
-            `"${r.description.replace(/"/g, '""')}"`,
-            r.descLength
+            `"${(r.description||'').replace(/"/g, '""')}"`,
+            r.descLength,
+            `"${(r.error||'').replace(/"/g, '""')}"`,
         ].join(','));
 
         const csv = [headers.join(','), ...rows].join('\n');
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+        a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }));
         a.download = `seo_scan_${new Date().toISOString().slice(0, 10)}.csv`;
         a.click();
     }
@@ -223,6 +359,7 @@
         document.getElementById('resultBody').innerHTML = '';
         tableData = [];
         document.getElementById('btnExport').classList.add('hidden');
+        document.getElementById('btnRetryErrors').style.display = 'none';
         document.getElementById('progressStatus').textContent = 'Ready';
         document.getElementById('emptyState').style.display = '';
     }

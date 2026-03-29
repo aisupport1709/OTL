@@ -72,11 +72,20 @@ def proxy():
             allow_redirects=True,
         )
         content_type = resp.headers.get('Content-Type', 'text/html; charset=utf-8')
-        return Response(resp.content, status=resp.status_code, content_type=content_type)
+        # Always return 200 so the JS can parse the HTML regardless of target status.
+        # Include the real target status in a header for reference.
+        proxy_resp = Response(resp.content, status=200, content_type=content_type)
+        proxy_resp.headers['X-Target-Status'] = str(resp.status_code)
+        return proxy_resp
 
     except requests.exceptions.Timeout:
-        return Response('Request timed out', status=504)
+        return Response('Timed out after 15 s', status=504)
     except requests.exceptions.TooManyRedirects:
         return Response('Too many redirects', status=502)
+    except requests.exceptions.ConnectionError as e:
+        msg = str(e)
+        if 'Name or service not known' in msg or 'nodename nor servname' in msg:
+            return Response('Domain not found (DNS error)', status=502)
+        return Response(f'Connection error: {msg[:120]}', status=502)
     except requests.exceptions.RequestException as e:
-        return Response(f'Fetch error: {str(e)}', status=502)
+        return Response(f'Fetch error: {str(e)[:120]}', status=502)
