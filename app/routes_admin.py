@@ -66,6 +66,7 @@ def list_users():
 def add_user():
     """Add a new user."""
     username = request.form.get('username', '').strip()
+    display_name = request.form.get('display_name', '').strip()
     password = request.form.get('password', '')
     role = request.form.get('role', 'user')
 
@@ -89,7 +90,7 @@ def add_user():
     allowed_apps = request.form.getlist('allowed_apps')
 
     # Create user
-    user = User(username=username, role=role, active=True)
+    user = User(username=username, display_name=display_name or None, role=role, active=True)
     user.set_password(password)
     user.set_allowed_apps(allowed_apps)
     db.session.add(user)
@@ -106,10 +107,22 @@ def edit_user(user_id):
     """Edit user details."""
     user = User.query.get_or_404(user_id)
 
+    # Update display name
+    display_name = request.form.get('display_name', '').strip()
+    user.display_name = display_name or None
+
     # Update role
     role = request.form.get('role', user.role)
     if role in ['admin', 'user']:
         user.role = role
+
+    # Update password only if provided
+    new_password = request.form.get('password', '').strip()
+    if new_password:
+        if not validate_password(new_password):
+            flash('Password must contain uppercase, lowercase, digit, and special character.', 'danger')
+            return redirect(url_for('admin.list_users'))
+        user.set_password(new_password)
 
     # Update allowed apps
     allowed_apps = request.form.getlist('allowed_apps')

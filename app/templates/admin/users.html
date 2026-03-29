@@ -11,16 +11,21 @@
 <!-- Add User Form -->
 <div class="bg-white rounded-lg shadow p-6 mb-8">
     <h3 class="text-lg font-bold text-gray-800 mb-4">Add New User</h3>
-    <form method="POST" action="{{ url_for('admin.add_user') }}" class="space-y-4">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <form method="POST" action="{{ url_for('admin.add_user') }}" class="space-y-4" autocomplete="off">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                <input type="text" name="username" required
+                <input type="text" name="username" required autocomplete="off" placeholder="e.g. john.smith"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
+                <input type="text" name="display_name" autocomplete="off" placeholder="e.g. John Smith"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                <input type="password" name="password" required
+                <input type="password" name="password" required autocomplete="new-password"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                     title="Min 1 uppercase, 1 lowercase, 1 digit, 1 special char">
             </div>
@@ -39,9 +44,9 @@
                 {% if all_apps %}
                     {% for app in all_apps %}
                     <div class="flex items-center">
-                        <input type="checkbox" id="app-{{ app.id }}" name="allowed_apps" value="{{ app.id }}"
+                        <input type="checkbox" id="add-app-{{ app.id }}" name="allowed_apps" value="{{ app.id }}"
                             class="w-4 h-4 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500">
-                        <label for="app-{{ app.id }}" class="ml-2 text-sm text-gray-700">
+                        <label for="add-app-{{ app.id }}" class="ml-2 text-sm text-gray-700">
                             {{ app.name }} <span class="text-gray-500 text-xs">{{ app.id }}</span>
                         </label>
                     </div>
@@ -67,6 +72,7 @@
         <thead class="bg-gray-50 border-b border-gray-200">
             <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Username</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Display Name</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Role</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Allowed Apps</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
@@ -78,6 +84,7 @@
             {% for user in users %}
             <tr class="hover:bg-gray-50 transition">
                 <td class="px-6 py-4 text-sm font-medium text-gray-800">{{ user.username }}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ user.display_name or '—' }}</td>
                 <td class="px-6 py-4 text-sm">
                     <span class="px-3 py-1 rounded-full text-xs font-medium
                         {% if user.role == 'admin' %}bg-purple-100 text-purple-700{% else %}bg-blue-100 text-blue-700{% endif %}">
@@ -122,11 +129,16 @@
     {% endif %}
 </div>
 
-<!-- Edit User Modal (simplified - inline form per row would be better) -->
+<!-- Edit User Modal -->
 <div id="editModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-        <h3 class="text-lg font-bold text-gray-800 mb-4">Edit User</h3>
-        <form method="POST" id="editForm">
+        <h3 class="text-lg font-bold text-gray-800 mb-4">Edit User: <span id="editUsername" class="text-indigo-600"></span></h3>
+        <form method="POST" id="editForm" autocomplete="off">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
+                <input type="text" name="display_name" id="editDisplayName" autocomplete="off" placeholder="e.g. John Smith"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
                 <select name="role" id="editRole" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
@@ -135,8 +147,15 @@
                 </select>
             </div>
             <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    New Password <span class="text-gray-400 font-normal text-xs">(leave blank to keep current)</span>
+                </label>
+                <input type="password" name="password" id="editPassword" autocomplete="new-password" placeholder="••••••••"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+            <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Allowed Apps</label>
-                <div id="appsCheckboxes" class="space-y-2 max-h-40 overflow-y-auto">
+                <div id="appsCheckboxes" class="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2 max-h-40 overflow-y-auto">
                 </div>
             </div>
             <div class="flex gap-3">
@@ -160,7 +179,10 @@
         if (!user) return;
 
         document.getElementById('editForm').action = `/admin/users/${userId}/edit`;
+        document.getElementById('editUsername').textContent = user.username;
+        document.getElementById('editDisplayName').value = user.display_name || '';
         document.getElementById('editRole').value = user.role;
+        document.getElementById('editPassword').value = '';
 
         const appsCheckboxes = document.getElementById('appsCheckboxes');
         appsCheckboxes.innerHTML = '';
@@ -169,11 +191,12 @@
         allApps.forEach(app => {
             const div = document.createElement('div');
             div.className = 'flex items-center';
+            // Use "modal-app-" prefix to avoid ID collision with the Add New User form
             div.innerHTML = `
-                <input type="checkbox" id="app-${app.id}" name="allowed_apps" value="${app.id}"
+                <input type="checkbox" id="modal-app-${app.id}" name="allowed_apps" value="${app.id}"
                     ${userApps.includes(app.id) ? 'checked' : ''}
                     class="w-4 h-4 text-indigo-600 rounded">
-                <label for="app-${app.id}" class="ml-2 text-sm text-gray-700">${app.name}</label>
+                <label for="modal-app-${app.id}" class="ml-2 text-sm text-gray-700">${app.name} <span class="text-gray-400 text-xs">${app.id}</span></label>
             `;
             appsCheckboxes.appendChild(div);
         });

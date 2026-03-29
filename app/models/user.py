@@ -32,6 +32,7 @@ class User(db.Model):
         return {
             'id': self.id,
             'username': self.username,
+            'display_name': self.display_name or '',
             'role': self.role,
             'allowed_apps': self.allowed_apps,
             'active': self.active,
