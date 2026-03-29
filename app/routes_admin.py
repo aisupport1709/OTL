@@ -235,6 +235,21 @@ def edit_key(key_id):
     return redirect(url_for('admin.list_keys'))
 
 
+@admin_bp.route('/keys/<int:key_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_key(key_id):
+    """Delete a key that is already revoked or expired."""
+    key = SharedKey.query.get_or_404(key_id)
+    if key.active and key.is_valid():
+        flash('Cannot delete an active key. Revoke it first.', 'danger')
+        return redirect(url_for('admin.list_keys'))
+    db.session.delete(key)
+    db.session.commit()
+    flash(f'Shared key #{key_id} deleted.', 'success')
+    return redirect(url_for('admin.list_keys'))
+
+
 @admin_bp.route('/keys/<int:key_id>/revoke', methods=['POST'])
 @login_required
 @admin_required

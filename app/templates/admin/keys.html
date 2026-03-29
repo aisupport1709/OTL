@@ -118,15 +118,20 @@
                         class="text-indigo-600 hover:text-indigo-800 font-medium">
                         <i class="bi bi-pencil"></i> Edit
                     </button>
-                    {% if key.active %}
+                    {% if key.active and key.is_valid() %}
                     <form method="POST" action="{{ url_for('admin.revoke_key', key_id=key.id) }}" style="display: inline;">
-                        <button type="submit" class="text-red-600 hover:text-red-800 font-medium"
+                        <button type="submit" class="text-orange-600 hover:text-orange-800 font-medium"
                             onclick="return confirm('Revoke this key? It will no longer work.')">
-                            <i class="bi bi-trash"></i> Revoke
+                            <i class="bi bi-slash-circle"></i> Revoke
                         </button>
                     </form>
                     {% else %}
-                    <span class="text-gray-400 text-sm">Revoked</span>
+                    <form method="POST" action="{{ url_for('admin.delete_key', key_id=key.id) }}" style="display: inline;">
+                        <button type="submit" class="text-red-600 hover:text-red-800 font-medium"
+                            onclick="return confirm('Permanently delete this key?')">
+                            <i class="bi bi-trash"></i> Delete
+                        </button>
+                    </form>
                     {% endif %}
                 </td>
             </tr>
