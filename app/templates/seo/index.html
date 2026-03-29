@@ -99,8 +99,13 @@
     const PROXY_URL = '/seo/api/proxy?url=';
     let tableData = [];   // { id, url, status, title, titleLength, description, descLength, error }
     let scanning = false;
+    const domainLastSeen = {};   // domain → timestamp, for per-domain spacing
 
     const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    function getDomain(url) {
+        try { return new URL(url).hostname; } catch { return url; }
+    }
 
     async function processUrls() {
         const input = document.getElementById('urlInput');
@@ -188,6 +193,15 @@
             status.textContent = `Processing ${i + 1} of ${urls.length}…`;
             const rowId = `row-${index - 1}`;
             addRowToTable(index, url, rowId);
+            // Per-domain spacing: add extra gap if same domain seen recently
+            const domain = getDomain(url);
+            const now = Date.now();
+            const lastSeen = domainLastSeen[domain] || 0;
+            const domainGap = now - lastSeen;
+            const minDomainGap = Math.max(delay, 1000); // at least 1 s between same-domain requests
+            if (domainGap < minDomainGap) await sleep(minDomainGap - domainGap);
+            domainLastSeen[domain] = Date.now();
+
             await fetchMeta(url, rowId, index);
 
             if (delay > 0 && i < urls.length - 1) await sleep(delay);
@@ -245,15 +259,33 @@
         let result = { id: index, url, status: 'Error', title: '', titleLength: 0, description: '', descLength: 0, error: '' };
 
         try {
-            const response = await fetch(PROXY_URL + encodeURIComponent(url));
+            let response = await fetch(PROXY_URL + encodeURIComponent(url));
 
             if (!response.ok) {
-                // Read error detail from proxy response body
                 const errText = await response.text();
                 throw new Error(errText || `Proxy error ${response.status}`);
             }
 
-            const targetStatus = response.headers.get('X-Target-Status') || '200';
+            let targetStatus = parseInt(response.headers.get('X-Target-Status') || '200');
+
+            // Auto-retry once on 429 after honouring Retry-After (or 5 s)
+            if (targetStatus === 429) {
+                const retryAfter = parseInt(response.headers.get('X-Retry-After') || '5');
+                const waitMs = Math.min(retryAfter * 1000, 10000); // cap at 10 s
+                statusCell.innerHTML = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-700 animate-pulse">429 – wait ${Math.round(waitMs/1000)}s…</span>`;
+                await sleep(waitMs);
+                response = await fetch(PROXY_URL + encodeURIComponent(url));
+                if (!response.ok) {
+                    const errText = await response.text();
+                    throw new Error(errText || `Proxy error ${response.status}`);
+                }
+                targetStatus = parseInt(response.headers.get('X-Target-Status') || '200');
+                if (targetStatus === 429) {
+                    throw new Error('Rate limited (429) — increase delay or retry later');
+                }
+                domainLastSeen[getDomain(url)] = Date.now(); // reset domain timer after wait
+            }
+
             const html = await response.text();
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
@@ -269,6 +301,11 @@
             const titleLenClass = (titleLen >= 30 && titleLen <= 60) ? 'font-bold text-green-600' : 'font-bold text-red-600';
             const descLenClass  = (descLen  >= 70 && descLen  <= 150) ? 'font-bold text-green-600' : 'font-bold text-red-600';
 
+            // Treat non-2xx target responses as errors even if HTML was returned
+            if (targetStatus >= 400) {
+                throw new Error(`Target returned HTTP ${targetStatus}`);
+            }
+
             if (metaDesc.trim()) {
                 statusCell.innerHTML = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Found</span>';
                 tr.dataset.status = 'found';
@@ -277,10 +314,6 @@
                 statusCell.innerHTML = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">Missing</span>';
                 tr.dataset.status = 'missing';
                 result.status = 'Not Found';
-                // Warn if target returned non-200
-                if (targetStatus !== '200') {
-                    statusCell.querySelector('span').title = `Target returned HTTP ${targetStatus}`;
-                }
             }
 
             titleCell.textContent = pageTitle || '—';
@@ -358,6 +391,7 @@
     function clearTable() {
         document.getElementById('resultBody').innerHTML = '';
         tableData = [];
+        Object.keys(domainLastSeen).forEach(k => delete domainLastSeen[k]);
         document.getElementById('btnExport').classList.add('hidden');
         document.getElementById('btnRetryErrors').style.display = 'none';
         document.getElementById('progressStatus').textContent = 'Ready';

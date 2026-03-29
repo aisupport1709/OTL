@@ -1,3 +1,4 @@
+import random
 from urllib.parse import urlparse
 from flask import Blueprint, render_template, request, Response
 from app.routes_auth import login_required, app_access_required
@@ -6,15 +7,30 @@ seo_bp = Blueprint('seo', __name__, url_prefix='/seo')
 seo_api_bp = Blueprint('seo_api', __name__, url_prefix='/seo/api')
 
 FETCH_TIMEOUT = 15
-FETCH_HEADERS = {
-    'User-Agent': (
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-        'AppleWebKit/537.36 (KHTML, like Gecko) '
-        'Chrome/124.0.0.0 Safari/537.36'
-    ),
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.5',
-}
+
+# Rotate through several realistic browser User-Agents
+_USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
+]
+
+def _make_headers():
+    return {
+        'User-Agent': random.choice(_USER_AGENTS),
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Upgrade-Insecure-Requests': '1',
+    }
 
 
 def _is_safe_url(url):
@@ -67,15 +83,17 @@ def proxy():
         import requests
         resp = requests.get(
             url,
-            headers=FETCH_HEADERS,
+            headers=_make_headers(),
             timeout=FETCH_TIMEOUT,
             allow_redirects=True,
         )
         content_type = resp.headers.get('Content-Type', 'text/html; charset=utf-8')
-        # Always return 200 so the JS can parse the HTML regardless of target status.
-        # Include the real target status in a header for reference.
+        # Always return 200 so JS can parse HTML regardless of target status.
         proxy_resp = Response(resp.content, status=200, content_type=content_type)
         proxy_resp.headers['X-Target-Status'] = str(resp.status_code)
+        # Forward Retry-After so JS can honour it on 429
+        if 'Retry-After' in resp.headers:
+            proxy_resp.headers['X-Retry-After'] = resp.headers['Retry-After']
         return proxy_resp
 
     except requests.exceptions.Timeout:
