@@ -25,7 +25,11 @@ def detect_file_type(filename):
     elif '154' in filename:
         return '154'
     else:
-        raise ValueError(f"Cannot detect file type from filename: {filename}")
+        raise ValueError(
+            f"Cannot detect file type from filename: '{filename}'\n"
+            f"Filename must contain '911' or '154' and date pattern.\n"
+            f"Expected format: '911 t 01.02.2026-28.02.2026' or '154 t 01-02-2026-28-02-2026'"
+        )
 
 
 def extract_month_year(filename):
@@ -37,7 +41,10 @@ def extract_month_year(filename):
     # Regex for date patterns: DD.MM.YYYY or DD-MM-YYYY (with optional time)
     match = re.search(r'(\d{2})[.\-](\d{2})[.\-](\d{4})', filename)
     if not match:
-        raise ValueError(f"Cannot extract month/year from filename: {filename}")
+        raise ValueError(
+            f"Cannot extract month/year from filename: '{filename}'\n"
+            f"Expected format: '911 t 01.02.2026-28.02.2026' or '154 t 01-02-2026-28-02-2026'"
+        )
 
     day_str, month_str, year_str = match.groups()
     month = int(month_str)
@@ -315,7 +322,7 @@ def import_pl_google_sheet(url, month=None, year=None):
                 extracted_month = int(title_match.group(2))
                 extracted_year = int(title_match.group(3))
 
-        # Use provided month/year, then try sheet title, then content, then use current month/year
+        # Use provided month/year, then try sheet title, then content
         if month is None or year is None:
             if extracted_month and extracted_year:
                 month = month or extracted_month
@@ -326,10 +333,12 @@ def import_pl_google_sheet(url, month=None, year=None):
                     month = month or detected_month
                     year = year or detected_year
                 else:
-                    # Fallback to current month/year if nothing found
-                    now = datetime.now()
-                    month = month or now.month
-                    year = year or now.year
+                    # Error if we couldn't extract month/year from any source
+                    raise ValueError(
+                        f"Cannot extract month/year. Please ensure:\n"
+                        f"1. Sheet name contains date pattern (e.g., '911 t 01.02.2026-28.02.2026')\n"
+                        f"2. Or provide month/year manually in the import form"
+                    )
 
         header_idx, skiprows = find_header_row(tmp_path)
 
