@@ -1,0 +1,272 @@
+{% extends "pl/base.html" %}
+{% block title %}P&L Report - OTL P&L{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-2xl font-bold text-gray-800"><i class="bi bi-bar-chart"></i> P&L Report</h2>
+    <div class="flex items-center gap-3">
+        <label for="year-selector" class="text-sm font-medium text-gray-700">Year:</label>
+        <select id="year-selector" class="px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500">
+            <option value="">-- Select Year --</option>
+        </select>
+        <button onclick="exportReport()" id="btn-export" class="hidden px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition flex items-center gap-2">
+            <i class="bi bi-file-earmark-excel"></i> Export Excel
+        </button>
+    </div>
+</div>
+
+<!-- Loading state -->
+<div id="loading" class="hidden">
+    <div class="text-center py-12">
+        <div class="animate-spin inline-block w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full"></div>
+        <p class="text-gray-500 mt-2">Loading P&L data...</p>
+    </div>
+</div>
+
+<!-- No data state -->
+<div id="no-data" class="hidden">
+    <div class="bg-white rounded-xl shadow-sm p-12 text-center">
+        <i class="bi bi-inbox text-5xl text-gray-300 block mb-3"></i>
+        <p class="text-gray-500">No P&L data available. Please <a href="{{ url_for('pl.import_page') }}" class="text-emerald-600 font-medium">import data</a> first.</p>
+    </div>
+</div>
+
+<!-- P&L Table -->
+<div id="table-container" class="hidden bg-white rounded-xl shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-800 text-white sticky top-0 z-20">
+                <tr>
+                    <th class="px-4 py-3 text-left font-semibold sticky left-0 z-30" style="min-width: 250px; width: 250px;">Chỉ Tiêu</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 1</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 2</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 3</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 4</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 5</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 6</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 7</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 8</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 9</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 10</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 11</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 12</th>
+                    <th class="px-4 py-3 text-right font-semibold bg-gray-700 min-w-[140px]">Tổng Năm</th>
+                </tr>
+            </thead>
+            <tbody id="table-body" class="divide-y divide-gray-100"></tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const LINE_ITEMS = [
+    { name: 'Doanh thu thuần', formula: 'TK 511x (Ps Có)' },
+    { name: 'Giá vốn hàng bán', formula: 'TK 154x (Ps Nợ)' },
+    { name: 'Lợi nhuận gộp', formula: 'Doanh thu thuần - Giá vốn hàng bán' },
+    { name: 'Chi phí QLDN', formula: 'TK 642x (Ps Nợ)' },
+    { name: 'Lợi nhuận thuần từ HĐKD', formula: 'Lợi nhuận gộp - Chi phí QLDN' },
+    { name: 'Doanh thu HĐTC', formula: 'TK 515x (Ps Có)' },
+    { name: 'Chi phí tài chính', formula: 'TK 635x (Ps Nợ)' },
+    { name: 'Thu nhập khác', formula: 'TK 711x (Ps Có)' },
+    { name: 'Chi phí khác', formula: 'TK 811x (Ps Nợ)' },
+    { name: 'Lợi nhuận trước thuế', formula: 'Lợi nhuận HĐKD + (DTTC - CPTC) + (TN khác - CP khác)' },
+];
+
+const SUBTOTAL_ITEMS = new Set(['Lợi nhuận gộp', 'Lợi nhuận thuần từ HĐKD', 'Lợi nhuận trước thuế']);
+
+function formatCurrency(value) {
+    if (value === null || value === undefined || isNaN(value)) {
+        return '-';
+    }
+    const isNegative = value < 0;
+    const absValue = Math.abs(value);
+    const formatted = absValue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    return isNegative ? `(${formatted})` : formatted;
+}
+
+async function loadAvailableYears() {
+    try {
+        const resp = await fetch('/pl/api/available-years');
+        const data = await resp.json();
+        const selector = document.getElementById('year-selector');
+
+        if (data.years && data.years.length > 0) {
+            data.years.sort((a, b) => b - a); // Descending order
+            data.years.forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                selector.appendChild(option);
+            });
+
+            // Auto-select first (most recent) year
+            if (data.years.length > 0) {
+                selector.value = data.years[0];
+                loadPLReport(data.years[0]);
+            }
+        } else {
+            showNoData();
+        }
+    } catch (err) {
+        console.error('Error loading years:', err);
+        showNoData();
+    }
+}
+
+async function loadPLReport(year) {
+    const loading = document.getElementById('loading');
+    const tableContainer = document.getElementById('table-container');
+    const noData = document.getElementById('no-data');
+    const exportBtn = document.getElementById('btn-export');
+
+    loading.classList.remove('hidden');
+    tableContainer.classList.add('hidden');
+    noData.classList.add('hidden');
+    exportBtn.classList.add('hidden');
+
+    try {
+        const resp = await fetch(`/pl/api/report?year=${year}`);
+        const data = await resp.json();
+
+        if (resp.ok && data.monthly) {
+            renderTable(data.monthly, data.annual, data.sub_accounts || {});
+            tableContainer.classList.remove('hidden');
+            exportBtn.classList.remove('hidden');
+        } else {
+            showNoData();
+        }
+    } catch (err) {
+        console.error('Error loading P&L report:', err);
+        showNoData();
+    } finally {
+        loading.classList.add('hidden');
+    }
+}
+
+function exportReport() {
+    const year = document.getElementById('year-selector').value;
+    if (!year) return;
+    window.location.href = `/pl/api/export?year=${year}`;
+}
+
+function renderTable(monthlyData, annualData, subAccountsData) {
+    const tbody = document.getElementById('table-body');
+    tbody.innerHTML = '';
+
+    LINE_ITEMS.forEach(item => {
+        const lineItem = item.name;
+        const formula = item.formula;
+
+        const row = document.createElement('tr');
+
+        // Determine row styling
+        let rowClass = 'divide-x divide-gray-100 hover:bg-gray-50';
+        if (SUBTOTAL_ITEMS.has(lineItem)) {
+            rowClass += ' bg-emerald-50 font-semibold';
+        }
+
+        row.className = rowClass;
+
+        // Line item name + formula
+        const nameCell = document.createElement('td');
+        nameCell.className = 'px-4 py-3 sticky left-0';
+        nameCell.style.minWidth = '250px';
+        nameCell.style.width = '250px';
+        nameCell.style.position = 'sticky';
+        nameCell.style.left = '0';
+        nameCell.style.zIndex = '10';
+        nameCell.style.backgroundColor = SUBTOTAL_ITEMS.has(lineItem) ? '#f0fdf4' : '#ffffff';
+
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'font-medium text-gray-700';
+        nameDiv.textContent = lineItem;
+
+        const formulaDiv = document.createElement('div');
+        formulaDiv.className = 'text-xs text-gray-500 mt-1';
+        formulaDiv.textContent = formula;
+        formulaDiv.style.lineHeight = '1.3';
+
+        nameCell.appendChild(nameDiv);
+        nameCell.appendChild(formulaDiv);
+        row.appendChild(nameCell);
+
+        // Monthly values
+        for (let month = 1; month <= 12; month++) {
+            const monthData = monthlyData[month] || {};
+            const value = monthData[lineItem] || 0;
+
+            const cell = document.createElement('td');
+            cell.className = 'px-4 py-3 text-right text-gray-800 tabular-nums';
+            cell.textContent = formatCurrency(value);
+            row.appendChild(cell);
+        }
+
+        // Annual total
+        const annualCell = document.createElement('td');
+        annualCell.className = 'px-4 py-3 text-right text-gray-800 font-semibold tabular-nums bg-gray-50';
+        annualCell.textContent = formatCurrency(annualData[lineItem] || 0);
+        row.appendChild(annualCell);
+
+        tbody.appendChild(row);
+
+        // Render sub-account rows
+        const subs = subAccountsData[lineItem] || {};
+        const sortedCodes = Object.keys(subs).sort();
+        sortedCodes.forEach(code => {
+            const sub = subs[code];
+            const subRow = document.createElement('tr');
+            subRow.className = 'text-xs text-gray-500 bg-gray-50/50 hover:bg-gray-100/50';
+
+            const subNameCell = document.createElement('td');
+            subNameCell.className = 'px-4 py-2 sticky left-0';
+            subNameCell.style.minWidth = '250px';
+            subNameCell.style.width = '250px';
+            subNameCell.style.position = 'sticky';
+            subNameCell.style.left = '0';
+            subNameCell.style.zIndex = '5';
+            subNameCell.style.backgroundColor = '#f9fafb';
+            subNameCell.style.paddingLeft = '2rem';
+            subNameCell.innerHTML = `<span class="font-mono">${code}</span> ${sub.name}`;
+
+            subRow.appendChild(subNameCell);
+
+            // Sub-account monthly values
+            for (let month = 1; month <= 12; month++) {
+                const cell = document.createElement('td');
+                cell.className = 'px-4 py-2 text-right tabular-nums';
+                const val = (sub.monthly || {})[month] || 0;
+                cell.textContent = val === 0 ? '-' : formatCurrency(val);
+                subRow.appendChild(cell);
+            }
+
+            // Sub-account annual value
+            const annualSubCell = document.createElement('td');
+            annualSubCell.className = 'px-4 py-2 text-right tabular-nums bg-gray-50/80';
+            annualSubCell.textContent = formatCurrency(sub.annual || 0);
+            subRow.appendChild(annualSubCell);
+
+            tbody.appendChild(subRow);
+        });
+    });
+}
+
+function showNoData() {
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('table-container').classList.add('hidden');
+    document.getElementById('no-data').classList.remove('hidden');
+}
+
+// Event listeners
+document.getElementById('year-selector').addEventListener('change', function(e) {
+    if (e.target.value) {
+        loadPLReport(parseInt(e.target.value));
+    }
+});
+
+// Load on page load
+document.addEventListener('DOMContentLoaded', loadAvailableYears);
+</script>
+{% endblock %}

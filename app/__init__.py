@@ -20,6 +20,7 @@ def create_app():
     from app.routes_admin import admin_bp
     from app.routes_apps import apps_bp
     from app.routes_seo import seo_bp, seo_api_bp
+    from app.routes_pl import pl_bp, pl_api_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
@@ -28,6 +29,8 @@ def create_app():
     app.register_blueprint(apps_bp)
     app.register_blueprint(seo_bp)
     app.register_blueprint(seo_api_bp)
+    app.register_blueprint(pl_bp)
+    app.register_blueprint(pl_api_bp)
 
     with app.app_context():
         migrate_db()
@@ -90,8 +93,13 @@ def seed_data():
     if not User.query.filter_by(username='nguyenanhlinh').first():
         u = User(username='nguyenanhlinh', role='admin', active=True)
         u.set_password('123456@abc')
-        u.set_allowed_apps(['otl', 'seo'])
+        u.set_allowed_apps(['otl', 'seo', 'pl'])
         db.session.add(u)
+    else:
+        # Ensure admin user has 'pl' app access
+        admin = User.query.filter_by(username='nguyenanhlinh').first()
+        if admin and 'pl' not in admin.get_allowed_apps():
+            admin.set_allowed_apps(admin.get_allowed_apps() + ['pl'])
 
     if not App.query.get('otl'):
         db.session.add(App(id='otl', name='OTL App', path='/otl/', icon='bi-bar-chart-line-fill'))
@@ -102,5 +110,13 @@ def seed_data():
         db.session.add(App(id='seo', name='SEO Scan', path='/seo/', icon='bi-search'))
     else:
         App.query.get('seo').icon = App.query.get('seo').icon or 'bi-search'
+
+    if not App.query.get('pl'):
+        db.session.add(App(id='pl', name='OTL P&L', path='/pl/', icon='bi-graph-up-arrow', description='Báo cáo Kết quả Hoạt động Kinh doanh'))
+    else:
+        pl_app = App.query.get('pl')
+        pl_app.icon = pl_app.icon or 'bi-graph-up-arrow'
+        if not pl_app.description:
+            pl_app.description = 'Báo cáo Kết quả Hoạt động Kinh doanh'
 
     db.session.commit()

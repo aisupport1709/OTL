@@ -1,0 +1,207 @@
+{% extends "pl/base.html" %}
+{% block title %}Import P&L Data - OTL P&L{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="bi bi-cloud-upload"></i> Import P&L Data</h2>
+
+<div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+    <p class="text-sm text-amber-800"><strong>File Format:</strong> Accept "911 t" (P&L aggregation) and "154 t" (Cost of production) files. Filename must contain date pattern (e.g., "911 t 01.02.2026-28.02.2026")</p>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Upload Excel File -->
+    <div class="bg-white rounded-xl shadow-sm">
+        <div class="px-5 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Upload Excel File
+        </div>
+        <div class="p-5">
+            <p class="text-sm text-gray-500 mb-4">
+                Upload an Excel file (.xlsx) containing accounting data (911 t or 154 t files).
+                The system will automatically detect the file type and date from the filename.
+            </p>
+            <form id="upload-form" enctype="multipart/form-data" class="space-y-4">
+                <div>
+                    <label for="file-input" class="block text-sm font-medium text-gray-700 mb-1">Select Excel File</label>
+                    <input type="file" id="file-input" name="file" accept=".xlsx,.xls" required
+                        class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 border border-gray-300 rounded-lg cursor-pointer">
+                </div>
+                <button type="submit" id="btn-upload"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-5 rounded-lg transition shadow text-sm">
+                    <i class="bi bi-upload"></i> Import
+                </button>
+            </form>
+
+            <!-- Progress -->
+            <div id="upload-progress" class="mt-4 hidden">
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div class="bg-emerald-600 h-2.5 rounded-full animate-pulse" style="width: 100%"></div>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Importing data...</p>
+            </div>
+
+            <!-- Result -->
+            <div id="upload-result" class="mt-4 hidden"></div>
+        </div>
+    </div>
+
+    <!-- Import from Google Sheets -->
+    <div class="bg-white rounded-xl shadow-sm">
+        <div class="px-5 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
+            <i class="bi bi-google"></i> Import from Google Sheets
+        </div>
+        <div class="p-5">
+            <p class="text-sm text-gray-500 mb-4">
+                Paste a public Google Sheets link containing accounting data (911 t or 154 t).
+                The sheet must be publicly accessible (Share → Anyone with the link).
+            </p>
+            <div class="space-y-4">
+                <div>
+                    <label for="google-url" class="block text-sm font-medium text-gray-700 mb-1">Google Sheets URL</label>
+                    <input type="url" id="google-url" placeholder="https://docs.google.com/spreadsheets/d/..."
+                        class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
+                </div>
+                <button onclick="importGoogleSheet()" id="btn-google"
+                    class="bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-5 rounded-lg transition shadow text-sm">
+                    <i class="bi bi-cloud-download"></i> Import from Google
+                </button>
+            </div>
+
+            <!-- Progress -->
+            <div id="google-progress" class="mt-4 hidden">
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div class="bg-teal-600 h-2.5 rounded-full animate-pulse" style="width: 100%"></div>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Downloading and importing from Google Sheets...</p>
+            </div>
+
+            <!-- Result -->
+            <div id="google-result" class="mt-4 hidden"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Management -->
+<div class="mt-6">
+    <div class="bg-white rounded-xl shadow-sm max-w-lg">
+        <div class="px-5 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
+            <i class="bi bi-gear"></i> Data Management
+        </div>
+        <div class="p-5">
+            <p class="text-sm text-gray-500 mb-4">Clear all imported P&L data from the database.</p>
+            <button onclick="deleteAllData()"
+                class="border border-red-300 text-red-600 hover:bg-red-50 font-medium py-2 px-5 rounded-lg transition text-sm">
+                <i class="bi bi-trash"></i> Delete All P&L Data
+            </button>
+            <div id="delete-result" class="mt-4 hidden"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ─── Excel Upload ───────────────────────────────────────────────────
+document.getElementById('upload-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const fileInput = document.getElementById('file-input');
+    if (!fileInput.files.length) return;
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    const progress = document.getElementById('upload-progress');
+    const result = document.getElementById('upload-result');
+    const btn = document.getElementById('btn-upload');
+
+    progress.classList.remove('hidden');
+    result.classList.add('hidden');
+    btn.disabled = true;
+    btn.classList.add('opacity-50');
+
+    try {
+        const resp = await fetch('/pl/api/upload/pl-file', { method: 'POST', body: formData });
+        const data = await resp.json();
+
+        if (resp.ok) {
+            result.innerHTML = `
+                <div class="p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm">
+                    <strong>Success!</strong> ${data.message}
+                </div>
+                ${data.errors && data.errors.length ? `
+                <div class="p-3 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-sm mt-2">
+                    <strong>Warnings:</strong>
+                    <ul class="list-disc ml-4 mt-1">${data.errors.map(e => `<li>${e}</li>`).join('')}</ul>
+                </div>` : ''}`;
+        } else {
+            result.innerHTML = `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">${data.error}</div>`;
+        }
+    } catch (err) {
+        result.innerHTML = `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">Upload failed: ${err.message}</div>`;
+    }
+
+    progress.classList.add('hidden');
+    result.classList.remove('hidden');
+    btn.disabled = false;
+    btn.classList.remove('opacity-50');
+});
+
+// ─── Google Sheets Import ───────────────────────────────────────────
+async function importGoogleSheet() {
+    const url = document.getElementById('google-url').value.trim();
+    if (!url) return;
+
+    const progress = document.getElementById('google-progress');
+    const result = document.getElementById('google-result');
+    const btn = document.getElementById('btn-google');
+
+    progress.classList.remove('hidden');
+    result.classList.add('hidden');
+    btn.disabled = true;
+    btn.classList.add('opacity-50');
+
+    try {
+        const resp = await fetch('/pl/api/upload/pl-google', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+        });
+        const data = await resp.json();
+
+        if (resp.ok) {
+            result.innerHTML = `
+                <div class="p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm">
+                    <strong>Success!</strong> ${data.message}
+                </div>
+                ${data.errors && data.errors.length ? `
+                <div class="p-3 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-sm mt-2">
+                    <strong>Warnings:</strong>
+                    <ul class="list-disc ml-4 mt-1">${data.errors.map(e => `<li>${e}</li>`).join('')}</ul>
+                </div>` : ''}`;
+        } else {
+            result.innerHTML = `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">${data.error}</div>`;
+        }
+    } catch (err) {
+        result.innerHTML = `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">Import failed: ${err.message}</div>`;
+    }
+
+    progress.classList.add('hidden');
+    result.classList.remove('hidden');
+    btn.disabled = false;
+    btn.classList.remove('opacity-50');
+}
+
+// ─── Delete All ─────────────────────────────────────────────────────
+async function deleteAllData() {
+    if (!confirm('Are you sure you want to delete ALL P&L data?')) return;
+    const result = document.getElementById('delete-result');
+    try {
+        const resp = await fetch('/pl/api/delete-all', { method: 'DELETE' });
+        const data = await resp.json();
+        result.innerHTML = `<div class="p-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-sm">${data.message}</div>`;
+    } catch (err) {
+        result.innerHTML = `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">Error: ${err.message}</div>`;
+    }
+    result.classList.remove('hidden');
+}
+</script>
+{% endblock %}
