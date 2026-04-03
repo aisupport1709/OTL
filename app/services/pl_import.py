@@ -265,6 +265,17 @@ def import_pl_google_sheet(url, month=None, year=None):
 
     sheet_id = match.group(1)
 
+    # Try to get the sheet title via Google API (public sheets)
+    sheet_title = None
+    try:
+        api_url = f'https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}?fields=properties.title&key=AIzaSyBZL-5k-M47cPVU1i6Vc-NP0-yMdlKHQP4'
+        response = urllib.request.urlopen(api_url, timeout=5)
+        import json
+        data = json.loads(response.read())
+        sheet_title = data.get('properties', {}).get('title', '')
+    except Exception:
+        pass
+
     # Download as xlsx
     export_url = f'https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx'
     tmp_fd, tmp_path = tempfile.mkstemp(suffix='.xlsx')
@@ -275,11 +286,24 @@ def import_pl_google_sheet(url, month=None, year=None):
         # Auto-detect file type from content
         file_type = detect_file_type_from_content(tmp_path)
 
-        # Use provided month/year, or auto-detect from content
+        # Try to extract month/year from sheet title first (e.g., "911 t 01.02.2026-28.02.2026")
+        extracted_month = None
+        extracted_year = None
+        if sheet_title:
+            title_match = re.search(r'(\d{2})[.\-](\d{2})[.\-](\d{4})', sheet_title)
+            if title_match:
+                extracted_month = int(title_match.group(2))
+                extracted_year = int(title_match.group(3))
+
+        # Use provided month/year, then try sheet title, then content
         if month is None or year is None:
-            detected_month, detected_year = extract_month_year_from_content(tmp_path)
-            month = month or detected_month
-            year = year or detected_year
+            if extracted_month and extracted_year:
+                month = month or extracted_month
+                year = year or extracted_year
+            else:
+                detected_month, detected_year = extract_month_year_from_content(tmp_path)
+                month = month or detected_month
+                year = year or detected_year
 
         header_idx, skiprows = find_header_row(tmp_path)
 
