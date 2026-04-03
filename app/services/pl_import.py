@@ -265,23 +265,34 @@ def import_pl_google_sheet(url, month=None, year=None):
 
     sheet_id = match.group(1)
 
-    # Try to get the sheet title via Google API (public sheets)
-    sheet_title = None
-    try:
-        api_url = f'https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}?fields=properties.title&key=AIzaSyBZL-5k-M47cPVU1i6Vc-NP0-yMdlKHQP4'
-        response = urllib.request.urlopen(api_url, timeout=5)
-        import json
-        data = json.loads(response.read())
-        sheet_title = data.get('properties', {}).get('title', '')
-    except Exception:
-        pass
-
     # Download as xlsx
     export_url = f'https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx'
     tmp_fd, tmp_path = tempfile.mkstemp(suffix='.xlsx')
 
     try:
         urllib.request.urlretrieve(export_url, tmp_path)
+
+        # Try to get sheet title from API first
+        sheet_title = None
+        try:
+            api_url = f'https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}?fields=properties.title&key=AIzaSyBZL-5k-M47cPVU1i6Vc-NP0-yMdlKHQP4'
+            response = urllib.request.urlopen(api_url, timeout=5)
+            import json
+            data = json.loads(response.read())
+            sheet_title = data.get('properties', {}).get('title', '')
+        except Exception:
+            pass
+
+        # If API didn't work, try to extract sheet name from the downloaded Excel file
+        if not sheet_title:
+            try:
+                import openpyxl
+                wb = openpyxl.load_workbook(tmp_path)
+                # Get the first sheet's name (Google Sheets exports first sheet)
+                if wb.sheetnames:
+                    sheet_title = wb.sheetnames[0]
+            except Exception:
+                pass
 
         # Auto-detect file type from sheet title first (like filename), then from content
         file_type = None
