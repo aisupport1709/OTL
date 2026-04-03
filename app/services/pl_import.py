@@ -246,10 +246,16 @@ def import_pl_file(file_path, filename):
     return _import_dataframe(df, file_type, month, year, filename)
 
 
-def import_pl_google_sheet(url):
+def import_pl_google_sheet(url, month=None, year=None):
     """
     Import P&L data from a public Google Sheets link.
     Handles URLs with or without query parameters.
+
+    Args:
+        url: Google Sheets URL
+        month: (optional) Override month detection (1-12)
+        year: (optional) Override year detection
+
     Returns (success_count, error_count, errors).
     """
     # Extract spreadsheet ID - handles URLs with /edit?gid=... or #gid=...
@@ -266,11 +272,15 @@ def import_pl_google_sheet(url):
     try:
         urllib.request.urlretrieve(export_url, tmp_path)
 
-        # Filename will be something like the sheet ID, let's use that for file type detection
-        # For now, we'll need to accept it from the user or look at the sheet name
-        # For simplicity, we'll try to auto-detect from cell content
+        # Auto-detect file type from content
         file_type = detect_file_type_from_content(tmp_path)
-        month, year = extract_month_year_from_content(tmp_path)
+
+        # Use provided month/year, or auto-detect from content
+        if month is None or year is None:
+            detected_month, detected_year = extract_month_year_from_content(tmp_path)
+            month = month or detected_month
+            year = year or detected_year
+
         header_idx, skiprows = find_header_row(tmp_path)
 
         df = pd.read_excel(tmp_path, skiprows=skiprows, engine='openpyxl')

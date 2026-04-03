@@ -60,8 +60,24 @@
                     <input type="url" id="google-url" placeholder="https://docs.google.com/spreadsheets/d/..."
                         class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
                 </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label for="google-month" class="block text-sm font-medium text-gray-700 mb-1">Month</label>
+                        <select id="google-month" class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
+                            <option value="">Auto-detect</option>
+                            {% for m in range(1, 13) %}
+                            <option value="{{ m }}">{{ m }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="google-year" class="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                        <input type="number" id="google-year" placeholder="e.g., 2026" min="2020" max="2050"
+                            class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
+                    </div>
+                </div>
                 <button onclick="importGoogleSheet()" id="btn-google"
-                    class="bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-5 rounded-lg transition shadow text-sm">
+                    class="w-full bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-5 rounded-lg transition shadow text-sm">
                     <i class="bi bi-cloud-download"></i> Import from Google
                 </button>
             </div>
@@ -148,7 +164,13 @@ document.getElementById('upload-form').addEventListener('submit', async function
 // ─── Google Sheets Import ───────────────────────────────────────────
 async function importGoogleSheet() {
     const url = document.getElementById('google-url').value.trim();
-    if (!url) return;
+    const month = document.getElementById('google-month').value || null;
+    const year = document.getElementById('google-year').value || null;
+
+    if (!url) {
+        alert('Please enter a Google Sheets URL');
+        return;
+    }
 
     const progress = document.getElementById('google-progress');
     const result = document.getElementById('google-result');
@@ -160,10 +182,14 @@ async function importGoogleSheet() {
     btn.classList.add('opacity-50');
 
     try {
+        const body = { url };
+        if (month) body.month = parseInt(month);
+        if (year) body.year = parseInt(year);
+
         const resp = await fetch('/pl/api/upload/pl-google', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url }),
+            body: JSON.stringify(body),
         });
         const data = await resp.json();
 

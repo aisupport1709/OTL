@@ -78,6 +78,8 @@ def upload_pl_file():
 def upload_pl_google():
     data = request.get_json()
     url = (data or {}).get('url', '').strip()
+    month = (data or {}).get('month')
+    year = (data or {}).get('year')
 
     if not url:
         return jsonify({'error': 'No Google Sheets URL provided'}), 400
@@ -86,7 +88,7 @@ def upload_pl_google():
         return jsonify({'error': 'Invalid Google Sheets URL'}), 400
 
     try:
-        success, errors_count, error_details = import_pl_google_sheet(url)
+        success, errors_count, error_details = import_pl_google_sheet(url, month=month, year=year)
         return jsonify({
             'message': f'Import completed: {success} records imported, {errors_count} errors',
             'success_count': success,
