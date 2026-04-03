@@ -283,8 +283,17 @@ def import_pl_google_sheet(url, month=None, year=None):
     try:
         urllib.request.urlretrieve(export_url, tmp_path)
 
-        # Auto-detect file type from content
-        file_type = detect_file_type_from_content(tmp_path)
+        # Auto-detect file type from sheet title first (like filename), then from content
+        file_type = None
+        if sheet_title:
+            try:
+                file_type = detect_file_type(sheet_title)
+            except ValueError:
+                pass  # Sheet title doesn't contain file type marker
+
+        # Fallback to content detection if title didn't work
+        if not file_type:
+            file_type = detect_file_type_from_content(tmp_path)
 
         # Try to extract month/year from sheet title first (e.g., "911 t 01.02.2026-28.02.2026")
         extracted_month = None
