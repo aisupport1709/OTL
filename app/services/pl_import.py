@@ -390,8 +390,11 @@ def calculate_pl(year):
 
     Aggregation rules:
     - file_type='911': Revenue (511x credit, 515x credit, 711x credit) + Expenses (642x debit, 635x debit, 811x debit)
-    - file_type='154': COGS from accounts starting with 6 or 8 (debit side)
+    - file_type='154' (Cost of Production): Giá vốn hàng bán from accounts 6xx & 8xx (debit side)
     - Leaf-node filtering: only include codes that have no children within their (file, prefix) group
+
+    Account mapping:
+    - Giá vốn hàng bán (COGS): TK 154 t - TK 6xx & 8xx (Ps Nợ / Debit)
     """
     entries = PLEntry.query.filter_by(year=year).all()
 
@@ -482,7 +485,7 @@ def calculate_pl(year):
                     break
 
         elif entry.file_type == '154':
-            # File 154: COGS from accounts starting with 6 or 8 (debit side)
+            # File "154 t" (Cost of Production): Giá vốn hàng bán from accounts 6xx & 8xx (debit)
             if code[0] in ('6', '8'):
                 line_item = 'Giá vốn hàng bán'
                 leaf_set = get_leaf_set(entry.month, '154', 'COGS_6_8')
