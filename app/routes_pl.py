@@ -96,7 +96,14 @@ def upload_pl_google():
             'errors': error_details[:20],
         })
     except Exception as e:
-        return jsonify({'error': f'Import failed: {str(e)}'}), 500
+        error_msg = str(e)
+        # Improve error message for common issues
+        if '404' in error_msg:
+            error_msg = 'Sheet not found. Make sure: (1) URL is correct, (2) Sheet is publicly shared (Share → Anyone with the link), (3) Sheet exists and is not deleted'
+        elif 'HTTP Error' in error_msg:
+            error_msg = 'Cannot access Google Sheet. Ensure it is publicly shared (Share → Anyone with the link can view)'
+
+        return jsonify({'error': f'Import failed: {error_msg}'}), 500
 
 
 # ─── API: P&L Report ────────────────────────────────────────────────

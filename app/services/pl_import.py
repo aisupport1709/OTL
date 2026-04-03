@@ -295,15 +295,21 @@ def import_pl_google_sheet(url, month=None, year=None):
                 extracted_month = int(title_match.group(2))
                 extracted_year = int(title_match.group(3))
 
-        # Use provided month/year, then try sheet title, then content
+        # Use provided month/year, then try sheet title, then content, then use current month/year
         if month is None or year is None:
             if extracted_month and extracted_year:
                 month = month or extracted_month
                 year = year or extracted_year
             else:
                 detected_month, detected_year = extract_month_year_from_content(tmp_path)
-                month = month or detected_month
-                year = year or detected_year
+                if detected_month and detected_year:
+                    month = month or detected_month
+                    year = year or detected_year
+                else:
+                    # Fallback to current month/year if nothing found
+                    now = datetime.now()
+                    month = month or now.month
+                    year = year or now.year
 
         header_idx, skiprows = find_header_row(tmp_path)
 
@@ -356,6 +362,7 @@ def extract_month_year_from_content(filepath):
     """
     Extract month/year from cell content.
     Scans first 20 rows for date pattern.
+    Returns (month, year) or (None, None) if not found.
     """
     try:
         df_scan = pd.read_excel(filepath, nrows=20, header=None, engine='openpyxl')
@@ -369,9 +376,11 @@ def extract_month_year_from_content(filepath):
                 if 1 <= month <= 12:
                     return month, year
 
-        raise ValueError("Cannot extract month/year from content")
+        # Return None if not found (will use default)
+        return None, None
     except Exception as e:
-        raise ValueError(f"Error extracting month/year: {str(e)}")
+        # Return None on error (will use default)
+        return None, None
 
 
 def calculate_pl(year):
