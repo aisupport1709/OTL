@@ -36,9 +36,9 @@ SYSTEM REQUIREMENTS
    - Columns: Tk đ.ứng (code), Tên tk đ.ứng (name), Ps nợ (debit), Ps có (credit)
 
    File 2: "154 t" (Cost of Production)
-   - Purpose: Contains detailed production/manufacturing cost accounts
+   - Purpose: Contains detailed production/manufacturing cost accounts (6xx only)
    - Source: Cost accounting report from production department
-   - Accounts: 6xx (raw materials, labor, overhead), 8xx (cost adjustments)
+   - Accounts: 6xx only (raw materials, direct labor, manufacturing overhead)
    - Use: Aggregated as COGS (Giá vốn hàng bán)
    - Columns: Tk đ.ứng (code), Tên tk đ.ứng (name), Ps nợ (debit), Ps có (credit)
 
@@ -48,7 +48,7 @@ SYSTEM REQUIREMENTS
    - Account: 1541 (Inventory account)
    - Use: Added to COGS formula as inventory adjustment
    - Columns: Tk (code), Tên tk (name), Ps nợ (debit - the ending balance)
-   - Formula: COGS = Sum(6xx, 8xx from 154 t) + SDCK (negative adjustment)
+   - Formula: COGS = Sum(6xx from 154 t) + SDCK 1541 (negative adjustment)
 
 3. FILENAME REQUIREMENTS
    - Must contain date pattern: DD.MM.YYYY or DD-MM-YYYY
@@ -134,8 +134,8 @@ STEP 1: IDENTIFY ACCOUNT GROUPS (By Prefix)
    - 711x  → Thu nhập khác (Other Income)          [Use: Ps Có]
 
    Expense Accounts:
-   - 6xx, 8xx (File: 154 t) → Giá vốn hàng bán (COGS)
-     * Base COGS from production costs
+   - 6xx (File: 154 t) → Giá vốn hàng bán (COGS)
+     * Base COGS from production costs only (6xx)
      * [Use: Ps Nợ (Debit)]
      * Plus: SDCK 1541 ending inventory adjustment
    - 642x (File: 911 t) → Chi phí QLDN (Operating Expenses)  [Use: Ps Nợ]
@@ -152,10 +152,11 @@ STEP 2: HANDLE THREE FILE TYPES
    - Use Ps Nợ (debit) for expense accounts (642x, 635x, 811x)
 
    File "154 t" Processing:
-   - Filter accounts by prefix: 6xx, 8xx (production costs)
+   - Filter accounts by prefix: 6xx only (production costs)
    - Identify leaf nodes (accounts with no children)
    - Use Ps Nợ (debit) - cost accounts
    - Aggregate as single "Giá vốn hàng bán" line item
+   - Note: 8xx accounts are NOT included in 154 t file
 
    File "SDCK 1541" Processing:
    - Extract account codes and ending balance amounts
@@ -182,14 +183,16 @@ STEP 3: CALCULATE P&L LINE ITEMS (Sequential)
    Formula: COGS = Production Costs (154 t) + SDCK Adjustment (1541)
 
    Step A: Sum Production Costs from "154 t" file
-   = Sum of Ps Nợ (debit) from all LEAF codes starting with 6xx or 8xx
+   = Sum of Ps Nợ (debit) from all LEAF codes starting with 6xx ONLY
 
    Example of "154 t" accounts (leaf nodes only):
    - 6211 (Raw Materials): 1,000,000
    - 6221 (Direct Labor): 500,000
    - 6231 (Manufacturing Overhead): 200,000
-   - 8111 (Inventory Adjustment): 100,000
+   - 6241 (Factory Utilities): 100,000
    - Subtotal: 1,800,000
+
+   Note: 154 t file contains ONLY 6xx accounts (no 8xx)
 
    Step B: Add SDCK 1541 Ending Inventory Adjustment
    = SDCK balance from pl_sdck table (already stored as NEGATIVE)
@@ -251,21 +254,21 @@ ACCOUNTING FORMULA (Vietnamese Standard):
    Or:
    COGS = Production Costs - (Ending Inventory - Opening Inventory)
    Or:
-   COGS = Sum of 154t (6xx, 8xx costs) + SDCK 1541 (inventory adjustment)
+   COGS = Sum of 154t (6xx costs) + SDCK 1541 (inventory adjustment)
 
 WHY THREE FILE TYPES?
 
-   File "154 t" (TK 154 t - TK 6xx & 8xx):
-   ───────────────────────────────────────
+   File "154 t" (TK 154 t - TK 6xx):
+   ────────────────────────────────
    - Contains production costs INCURRED during the period
    - Accounts 6xx = Raw materials, direct labor, manufacturing overhead
-   - Accounts 8xx = Cost adjustments and reclassifications
+   - Note: 8xx accounts are NOT included in 154 t file
    - Represents actual EXPENDITURE on production
-   - Use Ps Nợ (debit side) values
+   - Use Ps Nợ (debit side) values only
    - Example:
      * 6211 (Raw Materials): 1,000,000
      * 6221 (Direct Labor): 500,000
-     * 8111 (Cost Adjustment): 100,000
+     * 6231 (Manufacturing Overhead): 100,000
      * Subtotal: 1,600,000
 
    File "SDCK 1541" (Số dư cuối kỳ - Ending Inventory):
@@ -285,12 +288,13 @@ WHY THREE FILE TYPES?
    - Contains only revenue and operating expenses
    - 511x = Revenue, 515x = Financial revenue, 711x = Other income
    - 642x = Operating expenses, 635x = Finance costs, 811x = Other expenses
-   - DOES NOT contain production costs (6xx, 8xx)
+   - DOES NOT contain production costs (6xx)
+   - Note: All 8xx accounts are cost adjustments, not in 154 t
    - COGS is NOT calculated from 911 t file
 
 LEAF-NODE FILTERING FOR COGS:
 
-   Raw 154 t File Content:
+   Raw 154 t File Content (6xx ONLY):
    ├── 6 (parent - EXCLUDED)
    │  ├── 62 (parent - EXCLUDED)
    │  │  ├── 621 (parent - EXCLUDED)
@@ -298,12 +302,12 @@ LEAF-NODE FILTERING FOR COGS:
    │  │  │  └── 6212 (LEAF - INCLUDED) ✓
    │  │  └── 622 (parent - EXCLUDED)
    │  │     └── 6221 (LEAF - INCLUDED) ✓
-   │  └── 63 (parent - EXCLUDED)
-   │     └── 631 (LEAF - INCLUDED) ✓
-   └── 8 (parent - EXCLUDED)
-      ├── 81 (parent - EXCLUDED)
-      │  └── 8111 (LEAF - INCLUDED) ✓
-      └── 82 (LEAF - INCLUDED) ✓
+   │  ├── 63 (parent - EXCLUDED)
+   │  │  └── 631 (LEAF - INCLUDED) ✓
+   │  └── 64 (parent - EXCLUDED)
+   │     └── 641 (LEAF - INCLUDED) ✓
+
+   Note: 8xx accounts are NOT in 154 t file
 
    Algorithm per month:
    1. Collect ALL codes starting with 6 or 8 from 154 t
@@ -313,16 +317,17 @@ LEAF-NODE FILTERING FOR COGS:
 
 STEP-BY-STEP COGS CALCULATION:
 
-   Step 1: Get Production Costs from 154 t (Leaf Codes Only)
-   ──────────────────────────────────────────────────────
+   Step 1: Get Production Costs from 154 t (6xx Leaf Codes Only)
+   ─────────────────────────────────────────────────────────────
    SELECT SUM(debit)
    FROM pl_entry
    WHERE year = 2026
      AND month = 2
      AND file_type = '154'
-     AND account_code IN (SELECT leaf_codes for prefixes 6, 8)
+     AND account_code IN (SELECT leaf_codes for prefix 6)
 
-   Example result: 1,600,000 (sum of all 6xx and 8xx leaf codes)
+   Example result: 1,600,000 (sum of all 6xx leaf codes)
+   Note: 8xx accounts are not included in 154 t file
 
    Step 2: Get SDCK Ending Inventory Adjustment
    ──────────────────────────────────────────
@@ -376,7 +381,7 @@ EXAMPLE WITH REAL NUMBERS:
 COMMON MISTAKES:
 
    ❌ MISTAKE: Using accounts from 911 t file for COGS
-   ✓ CORRECT: COGS comes ONLY from 154 t (6xx, 8xx) + SDCK
+   ✓ CORRECT: COGS comes ONLY from 154 t (6xx only) + SDCK
 
    ❌ MISTAKE: Including parent codes (6, 62, 621)
    ✓ CORRECT: Include ONLY leaf codes (6211, 6212, 6221, etc.)

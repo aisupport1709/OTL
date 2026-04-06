@@ -619,11 +619,12 @@ def calculate_pl(year):
 
     Aggregation rules:
     - file_type='911': Revenue (511x credit, 515x credit, 711x credit) + Expenses (642x debit, 635x debit, 811x debit)
-    - file_type='154' (Cost of Production): Giá vốn hàng bán from accounts 6xx & 8xx (debit side)
+    - file_type='154' (Cost of Production): Giá vốn hàng bán from accounts 6xx (debit side)
     - Leaf-node filtering: only include codes that have no children within their (file, prefix) group
+    - SDCK 1541: Ending inventory adjustment (subtracted from COGS)
 
     Account mapping:
-    - Giá vốn hàng bán (COGS): TK 154 t - TK 6xx & 8xx (Ps Nợ / Debit)
+    - Giá vốn hàng bán (COGS): TK 154 t - TK 6xx (Ps Nợ / Debit) + SDCK 1541 Inventory
     """
     entries = PLEntry.query.filter_by(year=year).all()
 
@@ -675,8 +676,9 @@ def calculate_pl(year):
             for entry in query.all():
                 code = str(entry.account_code).strip()
                 # Check if code matches this prefix
-                if prefix == 'COGS_6_8':
-                    if code[0] in ('6', '8'):
+                if prefix == 'COGS_6':
+                    # File 154 t: Only 6xx accounts (not 8xx)
+                    if code[0] == '6':
                         codes_for_group.add(code)
                 else:
                     if code.startswith(prefix):
@@ -714,10 +716,11 @@ def calculate_pl(year):
                     break
 
         elif entry.file_type == '154':
-            # File "154 t" (Cost of Production): Giá vốn hàng bán from accounts 6xx & 8xx (debit)
-            if code[0] in ('6', '8'):
+            # File "154 t" (Cost of Production): Giá vốn hàng bán from accounts 6xx (debit)
+            # Note: SDCK 1541 ending inventory adjustment is added separately below
+            if code[0] == '6':
                 line_item = 'Giá vốn hàng bán'
-                leaf_set = get_leaf_set(entry.month, '154', 'COGS_6_8')
+                leaf_set = get_leaf_set(entry.month, '154', 'COGS_6')
                 is_leaf = code in leaf_set
                 value = entry.debit
 
