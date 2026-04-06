@@ -361,6 +361,88 @@ def import_sdck_file(file_path, filename, account_target):
     return success_count, error_count, errors[:20]
 
 
+def _import_sdck_dataframe(df, account_target, month, year, source_name):
+    """
+    Import SDCK (Số dư cuối kỳ / Ending Balance) data from a DataFrame.
+    Columns: "Tk", "Tên tk", "Ps nợ"
+
+    Returns (success_count, error_count, errors).
+    """
+    success_count = 0
+    error_count = 0
+    errors = []
+
+    # Find columns
+    col_tk = None
+    col_ten = None
+    col_no = None
+
+    for col in df.columns:
+        col_str = str(col).strip().lower()
+        if 'tk' in col_str and col_tk is None:
+            col_tk = col
+        if 'tên' in col_str or 'ten' in col_str:
+            col_ten = col
+        if ('nợ' in col_str or 'no' in col_str) and col_no is None:
+            col_no = col
+
+    if not col_tk or not col_no:
+        errors.append(f"ERROR: Missing required columns. Expected: 'Tk', 'Tên tk', 'Ps nợ'")
+        return 0, len(errors), errors
+
+    for idx, row in df.iterrows():
+        try:
+            # Extract account code
+            account_code_raw = row.get(col_tk, '')
+            if pd.notna(account_code_raw):
+                code_str = str(account_code_raw).strip()
+                try:
+                    account_code = str(int(float(code_str)))
+                except (ValueError, TypeError):
+                    account_code = code_str
+            else:
+                account_code = ''
+
+            account_name = str(row.get(col_ten, '')).strip() if col_ten else ''
+            balance_raw = row.get(col_no, 0)
+
+            # Parse balance as float and convert to negative (for Ps Nợ)
+            try:
+                balance = -float(balance_raw) if pd.notna(balance_raw) else 0
+            except (ValueError, TypeError):
+                balance = 0
+
+            # Skip empty rows
+            if not account_code or balance == 0:
+                continue
+
+            # Create SDCK entry
+            entry = PLSDCK(
+                source_file=source_name,
+                account_target=account_target,
+                month=month,
+                year=year,
+                account_code=account_code,
+                account_name=account_name,
+                balance=balance,
+                imported_at=datetime.utcnow(),
+            )
+
+            db.session.add(entry)
+            success_count += 1
+
+        except Exception as e:
+            error_count += 1
+            errors.append(f"Row {idx + 1}: {str(e)}")
+
+    db.session.commit()
+
+    if success_count > 0:
+        errors.append(f"INFO: Imported {success_count} SDCK entries for account {account_target}")
+
+    return success_count, error_count, errors[:20]
+
+
 def import_pl_google_sheet(url, month=None, year=None):
     """
     Import P&L data from a public Google Sheets link.
@@ -411,9 +493,15 @@ def import_pl_google_sheet(url, month=None, year=None):
 
         # Auto-detect file type from sheet title first (like filename), then from content
         file_type = None
+        account_target = None  # For SDCK files
         if sheet_title:
             try:
-                file_type = detect_file_type(sheet_title)
+                file_type_result = detect_file_type(sheet_title)
+                # Handle SDCK detection (returns tuple)
+                if isinstance(file_type_result, tuple):
+                    file_type, account_target = file_type_result
+                else:
+                    file_type = file_type_result
             except ValueError:
                 pass  # Sheet title doesn't contain file type marker
 
@@ -453,7 +541,11 @@ def import_pl_google_sheet(url, month=None, year=None):
         df = pd.read_excel(tmp_path, skiprows=skiprows, engine='openpyxl')
         source_name = f'google-sheet:{sheet_id}'
 
-        return _import_dataframe(df, file_type, month, year, source_name)
+        # Handle SDCK import separately
+        if file_type == 'SDCK' and account_target:
+            return _import_sdck_dataframe(df, account_target, month, year, source_name)
+        else:
+            return _import_dataframe(df, file_type, month, year, source_name)
     finally:
         os.close(tmp_fd)
         os.unlink(tmp_path)
