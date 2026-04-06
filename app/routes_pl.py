@@ -279,13 +279,18 @@ def export_pl_report():
 
         # Header row
         ws['A1'] = 'Chỉ Tiêu'
+        ws['B1'] = 'Mã TK'
         ws['A1'].font = header_font
+        ws['B1'].font = header_font
         ws['A1'].fill = header_fill
+        ws['B1'].fill = header_fill
         ws['A1'].alignment = center_align
+        ws['B1'].alignment = center_align
         ws['A1'].border = thin_border
+        ws['B1'].border = thin_border
 
         for month in range(1, 13):
-            col_letter = get_column_letter(month + 1)
+            col_letter = get_column_letter(month + 2)
             cell = ws[f'{col_letter}1']
             cell.value = f'Tháng {month}'
             cell.font = header_font
@@ -294,7 +299,7 @@ def export_pl_report():
             cell.border = thin_border
 
         # Annual column
-        annual_col = get_column_letter(14)
+        annual_col = get_column_letter(15)
         ws[f'{annual_col}1'] = 'Tổng Năm'
         ws[f'{annual_col}1'].font = header_font
         ws[f'{annual_col}1'].fill = header_fill
@@ -308,12 +313,16 @@ def export_pl_report():
 
             # Main line row
             ws[f'A{row}'] = line_item
+            ws[f'B{row}'] = ''  # Empty code column for main items
             ws[f'A{row}'].font = (subtotal_font if is_subtotal else main_row_font)
+            ws[f'B{row}'].font = (subtotal_font if is_subtotal else main_row_font)
             ws[f'A{row}'].fill = (subtotal_fill if is_subtotal else main_row_fill)
+            ws[f'B{row}'].fill = (subtotal_fill if is_subtotal else main_row_fill)
             ws[f'A{row}'].border = thin_border
+            ws[f'B{row}'].border = thin_border
 
             for month in range(1, 13):
-                col_letter = get_column_letter(month + 1)
+                col_letter = get_column_letter(month + 2)
                 cell = ws[f'{col_letter}{row}']
                 value = cleaned_monthly.get(month, {}).get(line_item, 0)
                 cell.value = value if value != 0 else None
@@ -339,12 +348,15 @@ def export_pl_report():
             subs = sub_accounts_by_line.get(line_item, {})
             for code in sorted(subs.keys()):
                 sub = subs[code]
-                ws[f'A{row}'] = f'    {code} {sub["name"]}'
+                ws[f'A{row}'] = f'    {sub["name"]}'
+                ws[f'B{row}'] = code
                 ws[f'A{row}'].font = sub_font
+                ws[f'B{row}'].font = sub_font
                 ws[f'A{row}'].border = thin_border
+                ws[f'B{row}'].border = thin_border
 
                 for month in range(1, 13):
-                    col_letter = get_column_letter(month + 1)
+                    col_letter = get_column_letter(month + 2)
                     cell = ws[f'{col_letter}{row}']
                     value = sub.get('monthly', {}).get(month, 0)
                     cell.value = value if value != 0 else None
@@ -364,9 +376,10 @@ def export_pl_report():
                 row += 1
 
         # Set column widths
-        ws.column_dimensions['A'].width = 40
-        for col in range(2, 15):
-            ws.column_dimensions[get_column_letter(col)].width = 15
+        ws.column_dimensions['A'].width = 35
+        ws.column_dimensions['B'].width = 15
+        for col in range(3, 16):
+            ws.column_dimensions[get_column_letter(col)].width = 13
 
         # Return file
         output = io.BytesIO()
@@ -523,20 +536,24 @@ def import_mappings_excel():
 
         for idx, row in df.iterrows():
             try:
-                local_code = str(row.get(local_col, '')).strip()
+                # Fix 1: strip .0 from numeric codes (pandas reads as float)
+                raw = str(row.get(local_col, '')).strip()
+                try:
+                    local_code = str(int(float(raw)))
+                except (ValueError, TypeError):
+                    local_code = raw
+
                 hq_code = str(row.get(hq_col, '')).strip()
 
-                if not local_code or not hq_code:
+                if not local_code or not hq_code or local_code == 'nan':
                     continue
 
-                # Skip if already exists
+                # Fix 2: upsert instead of skip
                 existing = AccountMapping.query.filter_by(local_code=local_code).first()
                 if existing:
-                    errors.append(f"Row {idx + 2}: {local_code} already exists, skipped")
-                    continue
-
-                mapping = AccountMapping(local_code=local_code, hq_code=hq_code)
-                db.session.add(mapping)
+                    existing.hq_code = hq_code
+                else:
+                    db.session.add(AccountMapping(local_code=local_code, hq_code=hq_code))
                 success_count += 1
             except Exception as e:
                 error_count += 1
@@ -622,20 +639,24 @@ def import_mappings_google():
 
             for idx, row in df.iterrows():
                 try:
-                    local_code = str(row.get(local_col, '')).strip()
+                    # Fix 1: strip .0 from numeric codes (pandas reads as float)
+                    raw = str(row.get(local_col, '')).strip()
+                    try:
+                        local_code = str(int(float(raw)))
+                    except (ValueError, TypeError):
+                        local_code = raw
+
                     hq_code = str(row.get(hq_col, '')).strip()
 
-                    if not local_code or not hq_code:
+                    if not local_code or not hq_code or local_code == 'nan':
                         continue
 
-                    # Skip if already exists
+                    # Fix 2: upsert instead of skip
                     existing = AccountMapping.query.filter_by(local_code=local_code).first()
                     if existing:
-                        errors.append(f"Row {idx + 2}: {local_code} already exists, skipped")
-                        continue
-
-                    mapping = AccountMapping(local_code=local_code, hq_code=hq_code)
-                    db.session.add(mapping)
+                        existing.hq_code = hq_code
+                    else:
+                        db.session.add(AccountMapping(local_code=local_code, hq_code=hq_code))
                     success_count += 1
                 except Exception as e:
                     error_count += 1

@@ -52,24 +52,6 @@
             </button>
         </div>
 
-        <!-- Mapping Table -->
-        <div class="border border-gray-200 rounded-lg overflow-hidden">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                        <th class="px-4 py-3 text-left font-semibold text-gray-700">Local Code</th>
-                        <th class="px-4 py-3 text-left font-semibold text-gray-700">HQ Code</th>
-                        <th class="px-4 py-3 text-center font-semibold text-gray-700 w-20">Count</th>
-                    </tr>
-                </thead>
-                <tbody id="mappings-tbody">
-                    <tr>
-                        <td colspan="3" class="px-4 py-4 text-center text-gray-500">No mappings yet. Import or add mappings to get started.</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
         <div id="mapping-result" class="mt-4 hidden"></div>
     </div>
 </div>
@@ -311,7 +293,7 @@
 
 {% block scripts %}
 <script>
-const mappingsData = {};
+let mappingsData = {};
 let plUrlInputCount = 0;
 let mappingUrlInputCount = 0;
 
@@ -493,7 +475,6 @@ async function loadMappingsFromDatabase() {
             data.mappings.forEach(m => {
                 mappingsData[m.local_code] = m.hq_code;
             });
-            updateMappingsMainTable();
         }
     } catch (err) {
         console.error('Error loading mappings:', err);
@@ -686,7 +667,6 @@ async function addMapping() {
         if (resp.ok) {
             mappingsData[localCode] = hqCode;
             updateEditMappingsTable();
-            updateMappingsMainTable();
             document.getElementById('edit-local-code').value = '';
             document.getElementById('edit-hq-code').value = '';
         } else {
@@ -704,7 +684,6 @@ async function removeMapping(localCode) {
         if (resp.ok) {
             delete mappingsData[localCode];
             updateEditMappingsTable();
-            updateMappingsMainTable();
         } else {
             alert(`Error: ${data.error}`);
         }
@@ -728,21 +707,6 @@ function updateEditMappingsTable() {
                     <i class="bi bi-trash"></i> Delete
                 </button>
             </td>
-        </tr>
-    `).join('');
-}
-
-function updateMappingsMainTable() {
-    const tbody = document.getElementById('mappings-tbody');
-    if (Object.keys(mappingsData).length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-gray-500">No mappings yet. Import or add mappings to get started.</td></tr>';
-        return;
-    }
-    tbody.innerHTML = Object.entries(mappingsData).map(([local, hq]) => `
-        <tr class="border-t border-gray-200 hover:bg-gray-50">
-            <td class="px-4 py-3 text-gray-900 font-mono">${local}</td>
-            <td class="px-4 py-3 text-gray-900 font-mono">${hq}</td>
-            <td class="px-4 py-3 text-center text-gray-500">-</td>
         </tr>
     `).join('');
 }
@@ -782,7 +746,6 @@ async function clearMappingData() {
         }
     }
     mappingsData = {};
-    updateMappingsMainTable();
     updateEditMappingsTable();
     result.innerHTML = `<div class="p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm"><strong>✓</strong> Cleared ${clearedCount} mappings</div>`;
     result.classList.remove('hidden');
