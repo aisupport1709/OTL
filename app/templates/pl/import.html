@@ -607,7 +607,8 @@ async function importMappingFiles() {
     }
     resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-sm mt-3"><strong>Summary:</strong> ${successCount} succeeded, ${failCount} failed</div>`;
     document.getElementById('mapping-import-progress').classList.add('hidden');
-    updateMappingsMainTable();
+    // Reload from database to show imported mappings
+    await loadMappingsFromDatabase();
 }
 
 async function importMappingSheets() {
@@ -653,10 +654,13 @@ async function importMappingSheets() {
     }
     resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-sm mt-3"><strong>Summary:</strong> ${successCount} succeeded, ${failCount} failed</div>`;
     document.getElementById('mapping-import-progress').classList.add('hidden');
-    updateMappingsMainTable();
+    // Reload from database to show imported mappings
+    await loadMappingsFromDatabase();
 }
 
-function openMappingEditModal() {
+async function openMappingEditModal() {
+    // Reload mappings from database before opening
+    await loadMappingsFromDatabase();
     document.getElementById('mapping-edit-modal').classList.remove('hidden');
     updateEditMappingsTable();
 }
