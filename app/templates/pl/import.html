@@ -2,235 +2,467 @@
 {% block title %}Import P&L Data - OTL P&L{% endblock %}
 
 {% block content %}
-<h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="bi bi-cloud-upload"></i> Import P&L Data</h2>
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-2xl font-bold text-gray-800"><i class="bi bi-cloud-upload"></i> Import P&L Data</h2>
+    <div class="flex gap-3">
+        <button onclick="openImportModal()" id="btn-import-modal"
+            class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-5 rounded-lg transition shadow text-sm">
+            <i class="bi bi-plus-lg"></i> Import Data
+        </button>
+        <button onclick="deleteAllData()"
+            class="border border-red-300 text-red-600 hover:bg-red-50 font-medium py-2 px-5 rounded-lg transition text-sm">
+            <i class="bi bi-trash"></i> Clear All Data
+        </button>
+    </div>
+</div>
 
 <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
     <p class="text-sm text-amber-800"><strong>File Format:</strong> Accept "911 t" (P&L aggregation) and "154 t" (Cost of production) files. Filename must contain date pattern (e.g., "911 t 01.02.2026-28.02.2026")</p>
 </div>
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <!-- Upload Excel File -->
-    <div class="bg-white rounded-xl shadow-sm">
-        <div class="px-5 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
-            <i class="bi bi-file-earmark-spreadsheet"></i> Upload Excel File
+<!-- Import Modal -->
+<div id="import-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-96 overflow-y-auto">
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+            <h3 class="text-lg font-semibold text-gray-800">Import Multiple Data Sources</h3>
+            <button onclick="closeImportModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
         </div>
-        <div class="p-5">
-            <p class="text-sm text-gray-500 mb-4">
-                Upload an Excel file (.xlsx) containing accounting data (911 t or 154 t files).
-                The system will automatically detect the file type and date from the filename.
-            </p>
-            <form id="upload-form" enctype="multipart/form-data" class="space-y-4">
+
+        <!-- Content -->
+        <div class="p-6 space-y-6">
+            <!-- Tab Buttons -->
+            <div class="flex gap-0 bg-gray-200 p-1 rounded-lg">
+                <button type="button" onclick="switchImportTab('files')"
+                    id="tab-files" class="flex-1 py-2 px-4 text-sm font-medium text-white bg-emerald-600 rounded-md transition">
+                    <i class="bi bi-file-earmark-excel"></i> Excel Files
+                </button>
+                <button type="button" onclick="switchImportTab('sheets')"
+                    id="tab-sheets" class="flex-1 py-2 px-4 text-sm font-medium text-gray-700 hover:text-gray-900 transition">
+                    <i class="bi bi-google"></i> Google Sheets
+                </button>
+            </div>
+
+            <!-- Excel Files Tab -->
+            <div id="tab-content-files" class="space-y-4">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p class="text-xs text-blue-800"><strong>Tip:</strong> Select multiple Excel files (.xlsx, .xls). Filename must contain date pattern like "911 t 01.02.2026-28.02.2026"</p>
+                </div>
                 <div>
-                    <label for="file-input" class="block text-sm font-medium text-gray-700 mb-1">Select Excel File</label>
-                    <input type="file" id="file-input" name="file" accept=".xlsx,.xls" required
+                    <label for="file-input-multi" class="block text-sm font-medium text-gray-700 mb-2">Select Excel Files</label>
+                    <input type="file" id="file-input-multi" name="files" accept=".xlsx,.xls" multiple
                         class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 border border-gray-300 rounded-lg cursor-pointer">
                 </div>
-                <button type="submit" id="btn-upload"
-                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-5 rounded-lg transition shadow text-sm">
-                    <i class="bi bi-upload"></i> Import
+                <div id="file-list" class="space-y-2"></div>
+                <div class="flex gap-3">
+                    <button type="button" onclick="importSelectedFiles()"
+                        class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-5 rounded-lg transition text-sm">
+                        <i class="bi bi-upload"></i> Import Selected Files
+                    </button>
+                    <button type="button" onclick="closeImportModal()"
+                        class="flex-1 border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-5 rounded-lg transition text-sm">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+
+            <!-- Google Sheets Tab -->
+            <div id="tab-content-sheets" class="hidden space-y-4">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p class="text-xs text-blue-800"><strong>Tip:</strong> Name your sheet with a date pattern like "911 t 01.02.2026-28.02.2026". Sheet must be publicly shared (Share → Anyone with the link).</p>
+                </div>
+                <div id="sheets-container" class="space-y-3">
+                    <!-- URL inputs will be added here -->
+                </div>
+                <button type="button" onclick="addSheetURL()"
+                    class="w-full border border-dashed border-emerald-400 text-emerald-700 hover:bg-emerald-50 font-medium py-2 px-5 rounded-lg transition text-sm">
+                    <i class="bi bi-plus-lg"></i> Add Another Sheet URL
                 </button>
-            </form>
+                <div class="flex gap-3">
+                    <button type="button" onclick="importSelectedSheets()"
+                        class="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-5 rounded-lg transition text-sm">
+                        <i class="bi bi-cloud-download"></i> Import Sheets
+                    </button>
+                    <button type="button" onclick="closeImportModal()"
+                        class="flex-1 border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-5 rounded-lg transition text-sm">
+                        Cancel
+                    </button>
+                </div>
+            </div>
 
             <!-- Progress -->
-            <div id="upload-progress" class="mt-4 hidden">
+            <div id="import-progress" class="hidden">
                 <div class="w-full bg-gray-200 rounded-full h-2.5">
                     <div class="bg-emerald-600 h-2.5 rounded-full animate-pulse" style="width: 100%"></div>
                 </div>
                 <p class="text-xs text-gray-500 mt-1">Importing data...</p>
             </div>
 
-            <!-- Result -->
-            <div id="upload-result" class="mt-4 hidden"></div>
+            <!-- Results -->
+            <div id="import-results" class="hidden space-y-2"></div>
         </div>
     </div>
+</div>
 
-    <!-- Import from Google Sheets -->
-    <div class="bg-white rounded-xl shadow-sm">
-        <div class="px-5 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
-            <i class="bi bi-google"></i> Import from Google Sheets
-        </div>
-        <div class="p-5">
-            <p class="text-sm text-gray-500 mb-4">
-                Paste a public Google Sheets link containing accounting data (911 t or 154 t).
-                The sheet must be publicly accessible (Share → Anyone with the link).
-            </p>
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                <p class="text-xs text-blue-800"><strong>Tip:</strong> Name your sheet with a date pattern like "911 t 01.02.2026-28.02.2026" for auto-detection. Otherwise, use the fields below.</p>
-            </div>
-            <div class="space-y-4">
-                <div>
-                    <label for="google-url" class="block text-sm font-medium text-gray-700 mb-1">Google Sheets URL *</label>
-                    <input type="url" id="google-url" placeholder="https://docs.google.com/spreadsheets/d/..."
-                        class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none" required>
+<!-- Account Mapping Section -->
+<div class="mt-8 bg-white rounded-xl shadow-sm">
+    <div class="px-6 py-4 border-b border-gray-100 font-semibold text-sm text-gray-700">
+        <i class="bi bi-link-45deg"></i> Map Local Account Code to HQ Account
+    </div>
+    <div class="p-6">
+        <p class="text-sm text-gray-500 mb-4">Map your local account codes to HQ account codes for consolidation.</p>
+
+        <div class="space-y-4">
+            <div class="flex gap-3 items-end">
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Local Account Code</label>
+                    <input type="text" id="local-code" placeholder="e.g., 5111"
+                        class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none">
                 </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label for="google-month" class="block text-sm font-medium text-gray-700 mb-1">Month (optional)</label>
-                        <select id="google-month" class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
-                            <option value="">Auto-detect from sheet name</option>
-                            {% for m in range(1, 13) %}
-                            <option value="{{ m }}">{{ m }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="google-year" class="block text-sm font-medium text-gray-700 mb-1">Year (optional)</label>
-                        <input type="number" id="google-year" placeholder="e.g., 2026" min="2020" max="2050"
-                            class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
-                    </div>
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">HQ Account Code</label>
+                    <input type="text" id="hq-code" placeholder="e.g., 50001"
+                        class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none">
                 </div>
-                <button onclick="importGoogleSheet()" id="btn-google"
-                    class="w-full bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-5 rounded-lg transition shadow text-sm">
-                    <i class="bi bi-cloud-download"></i> Import from Google
+                <button onclick="addAccountMapping()"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-5 rounded-lg transition text-sm">
+                    <i class="bi bi-plus-lg"></i> Add Mapping
                 </button>
             </div>
 
-            <!-- Progress -->
-            <div id="google-progress" class="mt-4 hidden">
-                <div class="w-full bg-gray-200 rounded-full h-2.5">
-                    <div class="bg-teal-600 h-2.5 rounded-full animate-pulse" style="width: 100%"></div>
-                </div>
-                <p class="text-xs text-gray-500 mt-1">Downloading and importing from Google Sheets...</p>
+            <!-- Existing Mappings Table -->
+            <div class="border border-gray-200 rounded-lg overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Local Code</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">HQ Code</th>
+                            <th class="px-4 py-3 text-center font-semibold text-gray-700">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mappings-tbody">
+                        <tr>
+                            <td colspan="3" class="px-4 py-4 text-center text-gray-500">No mappings yet. Add one to get started.</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
-
-            <!-- Result -->
-            <div id="google-result" class="mt-4 hidden"></div>
         </div>
     </div>
 </div>
 
-<!-- Data Management -->
-<div class="mt-6">
-    <div class="bg-white rounded-xl shadow-sm max-w-lg">
-        <div class="px-5 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
-            <i class="bi bi-gear"></i> Data Management
-        </div>
-        <div class="p-5">
-            <p class="text-sm text-gray-500 mb-4">Clear all imported P&L data from the database.</p>
-            <button onclick="deleteAllData()"
-                class="border border-red-300 text-red-600 hover:bg-red-50 font-medium py-2 px-5 rounded-lg transition text-sm">
-                <i class="bi bi-trash"></i> Delete All P&L Data
-            </button>
-            <div id="delete-result" class="mt-4 hidden"></div>
-        </div>
-    </div>
-</div>
+<!-- Delete Result -->
+<div id="delete-result" class="mt-6 hidden"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// ─── Excel Upload ───────────────────────────────────────────────────
-document.getElementById('upload-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const fileInput = document.getElementById('file-input');
-    if (!fileInput.files.length) return;
+let urlInputCount = 0;
 
-    const formData = new FormData();
-    formData.append('file', fileInput.files[0]);
+// ─── Import Modal ───────────────────────────────────────────────────
+function openImportModal() {
+    document.getElementById('import-modal').classList.remove('hidden');
+    // Initialize with 2 URL inputs for sheets
+    urlInputCount = 0;
+    document.getElementById('sheets-container').innerHTML = '';
+    addSheetURL();
+    addSheetURL();
+    // Update file list
+    updateFileList();
+}
 
-    const progress = document.getElementById('upload-progress');
-    const result = document.getElementById('upload-result');
-    const btn = document.getElementById('btn-upload');
+function closeImportModal() {
+    document.getElementById('import-modal').classList.add('hidden');
+    document.getElementById('file-list').innerHTML = '';
+    document.getElementById('import-progress').classList.add('hidden');
+    document.getElementById('import-results').classList.add('hidden');
+    document.getElementById('import-results').innerHTML = '';
+}
 
-    progress.classList.remove('hidden');
-    result.classList.add('hidden');
-    btn.disabled = true;
-    btn.classList.add('opacity-50');
+function switchImportTab(tab) {
+    // Update buttons
+    document.getElementById('tab-files').classList.toggle('bg-emerald-600', tab === 'files');
+    document.getElementById('tab-files').classList.toggle('text-white', tab === 'files');
+    document.getElementById('tab-files').classList.toggle('text-gray-700', tab === 'sheets');
 
-    try {
-        const resp = await fetch('/pl/api/upload/pl-file', { method: 'POST', body: formData });
-        const data = await resp.json();
+    document.getElementById('tab-sheets').classList.toggle('bg-emerald-600', tab === 'sheets');
+    document.getElementById('tab-sheets').classList.toggle('text-white', tab === 'sheets');
+    document.getElementById('tab-sheets').classList.toggle('text-gray-700', tab === 'files');
 
-        if (resp.ok) {
-            result.innerHTML = `
-                <div class="p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm">
-                    <strong>Success!</strong> ${data.message}
-                </div>
-                ${data.errors && data.errors.length ? `
-                <div class="p-3 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-sm mt-2">
-                    <strong>Warnings:</strong>
-                    <ul class="list-disc ml-4 mt-1">${data.errors.map(e => `<li>${e}</li>`).join('')}</ul>
-                </div>` : ''}`;
-        } else {
-            result.innerHTML = `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">${data.error}</div>`;
-        }
-    } catch (err) {
-        result.innerHTML = `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">Upload failed: ${err.message}</div>`;
-    }
+    // Update content
+    document.getElementById('tab-content-files').classList.toggle('hidden', tab !== 'files');
+    document.getElementById('tab-content-sheets').classList.toggle('hidden', tab !== 'sheets');
+}
 
-    progress.classList.add('hidden');
-    result.classList.remove('hidden');
-    btn.disabled = false;
-    btn.classList.remove('opacity-50');
-});
+// ─── Files Tab ──────────────────────────────────────────────────────
+function updateFileList() {
+    const fileInput = document.getElementById('file-input-multi');
+    const fileList = document.getElementById('file-list');
+    const files = fileInput.files;
 
-// ─── Google Sheets Import ───────────────────────────────────────────
-async function importGoogleSheet() {
-    const url = document.getElementById('google-url').value.trim();
-    const month = document.getElementById('google-month').value || null;
-    const year = document.getElementById('google-year').value || null;
-
-    if (!url) {
-        alert('Please enter a Google Sheets URL');
+    if (files.length === 0) {
+        fileList.innerHTML = '<p class="text-sm text-gray-500">No files selected</p>';
         return;
     }
 
-    const progress = document.getElementById('google-progress');
-    const result = document.getElementById('google-result');
-    const btn = document.getElementById('btn-google');
+    fileList.innerHTML = `
+        <div class="bg-gray-50 rounded-lg p-3">
+            <p class="text-sm font-medium text-gray-700 mb-2">Selected Files (${files.length}):</p>
+            <ul class="space-y-1">
+                ${Array.from(files).map((f, i) => `<li class="text-sm text-gray-600">• ${f.name}</li>`).join('')}
+            </ul>
+        </div>
+    `;
+}
 
-    progress.classList.remove('hidden');
-    result.classList.add('hidden');
-    btn.disabled = true;
-    btn.classList.add('opacity-50');
+document.getElementById('file-input-multi')?.addEventListener('change', updateFileList);
 
-    try {
-        const body = { url };
-        if (month) body.month = parseInt(month);
-        if (year) body.year = parseInt(year);
+async function importSelectedFiles() {
+    const fileInput = document.getElementById('file-input-multi');
+    const files = fileInput.files;
 
-        const resp = await fetch('/pl/api/upload/pl-google', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
-        const data = await resp.json();
-
-        if (resp.ok) {
-            result.innerHTML = `
-                <div class="p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm">
-                    <strong>Success!</strong> ${data.message}
-                </div>
-                ${data.errors && data.errors.length ? `
-                <div class="p-3 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-sm mt-2">
-                    <strong>Warnings:</strong>
-                    <ul class="list-disc ml-4 mt-1">${data.errors.map(e => `<li>${e}</li>`).join('')}</ul>
-                </div>` : ''}`;
-        } else {
-            result.innerHTML = `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">${data.error}</div>`;
-        }
-    } catch (err) {
-        result.innerHTML = `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">Import failed: ${err.message}</div>`;
+    if (files.length === 0) {
+        alert('Please select at least one file');
+        return;
     }
 
-    progress.classList.add('hidden');
-    result.classList.remove('hidden');
-    btn.disabled = false;
-    btn.classList.remove('opacity-50');
+    showImportProgress(true);
+    const resultsDiv = document.getElementById('import-results');
+    resultsDiv.innerHTML = '';
+    resultsDiv.classList.remove('hidden');
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const resp = await fetch('/pl/api/upload/pl-file', { method: 'POST', body: formData });
+            const data = await resp.json();
+
+            if (resp.ok) {
+                successCount++;
+                resultsDiv.innerHTML += `
+                    <div class="p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm">
+                        <strong>✓ ${file.name}:</strong> ${data.message}
+                    </div>
+                `;
+            } else {
+                failCount++;
+                resultsDiv.innerHTML += `
+                    <div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
+                        <strong>✗ ${file.name}:</strong> ${data.error}
+                    </div>
+                `;
+            }
+        } catch (err) {
+            failCount++;
+            resultsDiv.innerHTML += `
+                <div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
+                    <strong>✗ ${file.name}:</strong> ${err.message}
+                </div>
+            `;
+        }
+    }
+
+    // Summary
+    resultsDiv.innerHTML += `
+        <div class="p-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-sm mt-3">
+            <strong>Summary:</strong> ${successCount} succeeded, ${failCount} failed
+        </div>
+    `;
+
+    showImportProgress(false);
+}
+
+// ─── Google Sheets Tab ──────────────────────────────────────────────
+function addSheetURL() {
+    urlInputCount++;
+    const container = document.getElementById('sheets-container');
+    const urlId = `sheet-url-${urlInputCount}`;
+    const monthId = `sheet-month-${urlInputCount}`;
+    const yearId = `sheet-year-${urlInputCount}`;
+
+    const div = document.createElement('div');
+    div.id = `sheet-row-${urlInputCount}`;
+    div.className = 'border border-gray-200 rounded-lg p-4 space-y-3';
+    div.innerHTML = `
+        <div>
+            <label for="${urlId}" class="block text-sm font-medium text-gray-700 mb-1">Google Sheets URL</label>
+            <input type="url" id="${urlId}" placeholder="https://docs.google.com/spreadsheets/d/..."
+                class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 outline-none">
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+            <div>
+                <label for="${monthId}" class="block text-sm font-medium text-gray-700 mb-1">Month (optional)</label>
+                <select id="${monthId}" class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 outline-none">
+                    <option value="">Auto-detect</option>
+                    ${Array.from({length: 12}, (_, i) => `<option value="${i+1}">${i+1}</option>`).join('')}
+                </select>
+            </div>
+            <div>
+                <label for="${yearId}" class="block text-sm font-medium text-gray-700 mb-1">Year (optional)</label>
+                <input type="number" id="${yearId}" placeholder="2026" min="2020" max="2050"
+                    class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">&nbsp;</label>
+                <button type="button" onclick="removeSheetURL(${urlInputCount})" class="w-full border border-red-300 text-red-600 hover:bg-red-50 font-medium py-2 px-3 rounded-lg transition text-sm">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    container.appendChild(div);
+}
+
+function removeSheetURL(id) {
+    const row = document.getElementById(`sheet-row-${id}`);
+    if (row) row.remove();
+}
+
+async function importSelectedSheets() {
+    const container = document.getElementById('sheets-container');
+    const rows = container.querySelectorAll('[id^="sheet-row-"]');
+
+    if (rows.length === 0) {
+        alert('Please add at least one Google Sheets URL');
+        return;
+    }
+
+    showImportProgress(true);
+    const resultsDiv = document.getElementById('import-results');
+    resultsDiv.innerHTML = '';
+    resultsDiv.classList.remove('hidden');
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const row of rows) {
+        const id = row.id.replace('sheet-row-', '');
+        const url = document.getElementById(`sheet-url-${id}`).value.trim();
+        const month = document.getElementById(`sheet-month-${id}`).value || null;
+        const year = document.getElementById(`sheet-year-${id}`).value || null;
+
+        if (!url) continue;
+
+        try {
+            const body = { url };
+            if (month) body.month = parseInt(month);
+            if (year) body.year = parseInt(year);
+
+            const resp = await fetch('/pl/api/upload/pl-google', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const data = await resp.json();
+
+            if (resp.ok) {
+                successCount++;
+                resultsDiv.innerHTML += `
+                    <div class="p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm">
+                        <strong>✓ Sheet ${id}:</strong> ${data.message}
+                    </div>
+                `;
+            } else {
+                failCount++;
+                resultsDiv.innerHTML += `
+                    <div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
+                        <strong>✗ Sheet ${id}:</strong> ${data.error}
+                    </div>
+                `;
+            }
+        } catch (err) {
+            failCount++;
+            resultsDiv.innerHTML += `
+                <div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
+                    <strong>✗ Sheet ${id}:</strong> ${err.message}
+                </div>
+            `;
+        }
+    }
+
+    // Summary
+    resultsDiv.innerHTML += `
+        <div class="p-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-sm mt-3">
+            <strong>Summary:</strong> ${successCount} succeeded, ${failCount} failed
+        </div>
+    `;
+
+    showImportProgress(false);
+}
+
+function showImportProgress(show) {
+    document.getElementById('import-progress').classList.toggle('hidden', !show);
+}
+
+// ─── Account Mapping ────────────────────────────────────────────────
+const mappings = {};
+
+function addAccountMapping() {
+    const localCode = document.getElementById('local-code').value.trim();
+    const hqCode = document.getElementById('hq-code').value.trim();
+
+    if (!localCode || !hqCode) {
+        alert('Please enter both local and HQ account codes');
+        return;
+    }
+
+    mappings[localCode] = hqCode;
+    updateMappingsTable();
+
+    document.getElementById('local-code').value = '';
+    document.getElementById('hq-code').value = '';
+}
+
+function removeAccountMapping(localCode) {
+    delete mappings[localCode];
+    updateMappingsTable();
+}
+
+function updateMappingsTable() {
+    const tbody = document.getElementById('mappings-tbody');
+
+    if (Object.keys(mappings).length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-gray-500">No mappings yet. Add one to get started.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = Object.entries(mappings).map(([local, hq]) => `
+        <tr class="border-t border-gray-200 hover:bg-gray-50">
+            <td class="px-4 py-3 text-gray-900 font-mono">${local}</td>
+            <td class="px-4 py-3 text-gray-900 font-mono">${hq}</td>
+            <td class="px-4 py-3 text-center">
+                <button onclick="removeAccountMapping('${local}')" class="text-red-600 hover:text-red-700 text-sm">
+                    <i class="bi bi-trash"></i> Remove
+                </button>
+            </td>
+        </tr>
+    `).join('');
 }
 
 // ─── Delete All ─────────────────────────────────────────────────────
 async function deleteAllData() {
-    if (!confirm('Are you sure you want to delete ALL P&L data?')) return;
+    if (!confirm('Are you sure you want to delete ALL P&L data? This cannot be undone.')) return;
+
     const result = document.getElementById('delete-result');
+    result.classList.remove('hidden');
+
     try {
         const resp = await fetch('/pl/api/delete-all', { method: 'DELETE' });
         const data = await resp.json();
-        result.innerHTML = `<div class="p-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-sm">${data.message}</div>`;
+
+        if (resp.ok) {
+            result.innerHTML = `<div class="p-4 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm"><strong>✓</strong> ${data.message}</div>`;
+        } else {
+            result.innerHTML = `<div class="p-4 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm"><strong>✗</strong> ${data.error}</div>`;
+        }
     } catch (err) {
-        result.innerHTML = `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">Error: ${err.message}</div>`;
+        result.innerHTML = `<div class="p-4 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm"><strong>✗</strong> Error: ${err.message}</div>`;
     }
-    result.classList.remove('hidden');
 }
 </script>
 {% endblock %}
