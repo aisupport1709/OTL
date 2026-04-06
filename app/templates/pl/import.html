@@ -8,7 +8,7 @@
 <div class="bg-white rounded-xl shadow-sm mb-8">
     <div class="px-6 py-4 border-b border-gray-100">
         <h3 class="text-lg font-semibold text-gray-800"><i class="bi bi-file-earmark-spreadsheet"></i> Import Local PL Data</h3>
-        <p class="text-sm text-gray-500 mt-1">Import P&L files (911 t and 154 t). Filename must contain date pattern (e.g., "911 t 01.02.2026-28.02.2026")</p>
+        <p class="text-sm text-gray-500 mt-1">Import P&L files: <strong>911 t</strong> (Revenue), <strong>154 t</strong> (COGS), or <strong>SDCK 1541</strong> (Ending Balance). Filename must contain date pattern (e.g., "911 t 01.02.2026-28.02.2026" or "SDCK 1541 01.02.2026-28.02.2026")</p>
     </div>
     <div class="p-6">
         <div class="flex gap-3 mb-6">
@@ -100,7 +100,12 @@
             <!-- Excel Files Tab -->
             <div id="pl-tab-content-files" class="space-y-4">
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p class="text-xs text-blue-800"><strong>Format:</strong> Filename like "911 t 01.02.2026-28.02.2026" or "154 t 01.02.2026-28.02.2026"</p>
+                    <p class="text-xs text-blue-800"><strong>Supported formats:</strong></p>
+                    <ul class="text-xs text-blue-800 mt-2 space-y-1 ml-4">
+                        <li>• <strong>911 t</strong> — Revenue data: "911 t 01.02.2026-28.02.2026"</li>
+                        <li>• <strong>154 t</strong> — Cost of Goods Sold: "154 t 01.02.2026-28.02.2026"</li>
+                        <li>• <strong>SDCK 1541</strong> — Ending balance: "SDCK 1541 01.02.2026-28.02.2026"</li>
+                    </ul>
                 </div>
                 <div>
                     <label for="pl-file-input" class="block text-sm font-medium text-gray-700 mb-2">Select Excel Files</label>
@@ -123,7 +128,12 @@
             <!-- Google Sheets Tab -->
             <div id="pl-tab-content-sheets" class="hidden space-y-4">
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p class="text-xs text-blue-800"><strong>Format:</strong> Sheet name like "911 t 01.02.2026-28.02.2026". Sheet must be publicly shared.</p>
+                    <p class="text-xs text-blue-800"><strong>Supported formats:</strong> Sheet must be publicly shared.</p>
+                    <ul class="text-xs text-blue-800 mt-2 space-y-1 ml-4">
+                        <li>• <strong>911 t</strong> — Revenue: "911 t 01.02.2026-28.02.2026"</li>
+                        <li>• <strong>154 t</strong> — Cost of Goods Sold: "154 t 01.02.2026-28.02.2026"</li>
+                        <li>• <strong>SDCK 1541</strong> — Ending balance: "SDCK 1541 01.02.2026-28.02.2026"</li>
+                    </ul>
                 </div>
                 <div id="pl-sheets-container" class="space-y-3"></div>
                 <button type="button" onclick="addPLSheetURL()"
