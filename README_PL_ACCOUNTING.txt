@@ -134,7 +134,10 @@ STEP 1: IDENTIFY ACCOUNT GROUPS (By Prefix)
    - 711x  → Thu nhập khác (Other Income)          [Use: Ps Có]
 
    Expense Accounts:
-   - 154x / 6xx, 8xx (File: 154 t) → Giá vốn hàng bán (COGS) [Use: Ps Nợ (Debit)]
+   - 6xx, 8xx (File: 154 t) → Giá vốn hàng bán (COGS)
+     * Base COGS from production costs
+     * [Use: Ps Nợ (Debit)]
+     * Plus: SDCK 1541 ending inventory adjustment
    - 642x (File: 911 t) → Chi phí QLDN (Operating Expenses)  [Use: Ps Nợ]
    - 635x (File: 911 t) → Chi phí tài chính (Finance Costs)  [Use: Ps Nợ]
    - 811x (File: 911 t) → Chi phí khác (Other Expenses)      [Use: Ps Nợ]
@@ -175,8 +178,37 @@ STEP 3: CALCULATE P&L LINE ITEMS (Sequential)
    = Sum of Ps Có from all leaf codes starting with 511x
 
    Line 2: Giá vốn hàng bán (Cost of Goods Sold - COGS)
-   = Sum of Ps Nợ from all leaf codes (6xx, 8xx) in "154 t" file
-     + SDCK 1541 ending inventory adjustment (negative value)
+
+   Formula: COGS = Production Costs (154 t) + SDCK Adjustment (1541)
+
+   Step A: Sum Production Costs from "154 t" file
+   = Sum of Ps Nợ (debit) from all LEAF codes starting with 6xx or 8xx
+
+   Example of "154 t" accounts (leaf nodes only):
+   - 6211 (Raw Materials): 1,000,000
+   - 6221 (Direct Labor): 500,000
+   - 6231 (Manufacturing Overhead): 200,000
+   - 8111 (Inventory Adjustment): 100,000
+   - Subtotal: 1,800,000
+
+   Step B: Add SDCK 1541 Ending Inventory Adjustment
+   = SDCK balance from pl_sdck table (already stored as NEGATIVE)
+
+   Example of SDCK processing:
+   - File "SDCK 1541 28.02.2026.xlsx" contains:
+     * 154101 (Raw Materials on hand): 400,000
+     * 154102 (Work in Progress): 100,000
+     * 154103 (Finished Goods): 300,000
+     * Total: 800,000 → Stored as: -800,000
+
+   Final COGS Calculation:
+   = 1,800,000 (Production Costs) + (-800,000) (SDCK Adjustment)
+   = 1,000,000 (Final COGS)
+
+   Accounting Logic:
+   - Production Costs (154 t) = Direct costs incurred during period
+   - SDCK Adjustment (negative) = Ending inventory value subtracted
+   - Result = Actual cost of goods SOLD (not on hand)
 
    Line 3: Lợi nhuận gộp (Gross Profit)
    = Doanh thu thuần - Giá vốn hàng bán
@@ -203,6 +235,160 @@ STEP 3: CALCULATE P&L LINE ITEMS (Sequential)
    = Operating Profit + (Financial Revenue - Finance Costs)
                       + (Other Income - Other Expenses)
    = Lợi nhuận HĐKD + (DTTC - CPTC) + (TN khác - CP khác)
+
+
+DETAILED COGS (Giá vốn hàng bán) EXPLANATION
+================================================================================
+
+DEFINITION:
+   Giá vốn hàng bán (COGS) = Cost of Goods Sold
+   - The actual cost of products sold during the accounting period
+   - Distinguishes between costs incurred vs. costs of inventory on hand
+   - Critical for calculating Gross Profit (Revenue - COGS)
+
+ACCOUNTING FORMULA (Vietnamese Standard):
+   COGS = Opening Inventory + Production Costs - Ending Inventory
+   Or:
+   COGS = Production Costs - (Ending Inventory - Opening Inventory)
+   Or:
+   COGS = Sum of 154t (6xx, 8xx costs) + SDCK 1541 (inventory adjustment)
+
+WHY THREE FILE TYPES?
+
+   File "154 t" (TK 154 t - TK 6xx & 8xx):
+   ───────────────────────────────────────
+   - Contains production costs INCURRED during the period
+   - Accounts 6xx = Raw materials, direct labor, manufacturing overhead
+   - Accounts 8xx = Cost adjustments and reclassifications
+   - Represents actual EXPENDITURE on production
+   - Use Ps Nợ (debit side) values
+   - Example:
+     * 6211 (Raw Materials): 1,000,000
+     * 6221 (Direct Labor): 500,000
+     * 8111 (Cost Adjustment): 100,000
+     * Subtotal: 1,600,000
+
+   File "SDCK 1541" (Số dư cuối kỳ - Ending Inventory):
+   ────────────────────────────────────────────────────
+   - Contains ending balance of inventory account 1541
+   - Represents physical inventory VALUE on hand at month-end
+   - Accounts 154101, 154102, 154103 = Categories of inventory
+   - Stored as NEGATIVE to represent subtraction from COGS
+   - Example:
+     * 154101 (Raw Materials on hand): 400,000 → -400,000
+     * 154102 (Work in Progress): 100,000 → -100,000
+     * 154103 (Finished Goods): 300,000 → -300,000
+     * Subtotal: 800,000 → Stored as -800,000
+
+   File "911 t" (DOES NOT contain COGS accounts):
+   ──────────────────────────────────────────────
+   - Contains only revenue and operating expenses
+   - 511x = Revenue, 515x = Financial revenue, 711x = Other income
+   - 642x = Operating expenses, 635x = Finance costs, 811x = Other expenses
+   - DOES NOT contain production costs (6xx, 8xx)
+   - COGS is NOT calculated from 911 t file
+
+LEAF-NODE FILTERING FOR COGS:
+
+   Raw 154 t File Content:
+   ├── 6 (parent - EXCLUDED)
+   │  ├── 62 (parent - EXCLUDED)
+   │  │  ├── 621 (parent - EXCLUDED)
+   │  │  │  ├── 6211 (LEAF - INCLUDED) ✓
+   │  │  │  └── 6212 (LEAF - INCLUDED) ✓
+   │  │  └── 622 (parent - EXCLUDED)
+   │  │     └── 6221 (LEAF - INCLUDED) ✓
+   │  └── 63 (parent - EXCLUDED)
+   │     └── 631 (LEAF - INCLUDED) ✓
+   └── 8 (parent - EXCLUDED)
+      ├── 81 (parent - EXCLUDED)
+      │  └── 8111 (LEAF - INCLUDED) ✓
+      └── 82 (LEAF - INCLUDED) ✓
+
+   Algorithm per month:
+   1. Collect ALL codes starting with 6 or 8 from 154 t
+   2. Identify leaf codes (codes with no children)
+   3. Sum ONLY leaf codes' debit values
+   4. Ignore parent accounts (they aggregate children)
+
+STEP-BY-STEP COGS CALCULATION:
+
+   Step 1: Get Production Costs from 154 t (Leaf Codes Only)
+   ──────────────────────────────────────────────────────
+   SELECT SUM(debit)
+   FROM pl_entry
+   WHERE year = 2026
+     AND month = 2
+     AND file_type = '154'
+     AND account_code IN (SELECT leaf_codes for prefixes 6, 8)
+
+   Example result: 1,600,000 (sum of all 6xx and 8xx leaf codes)
+
+   Step 2: Get SDCK Ending Inventory Adjustment
+   ──────────────────────────────────────────
+   SELECT SUM(balance)  -- Already stored as NEGATIVE
+   FROM pl_sdck
+   WHERE year = 2026
+     AND month = 2
+     AND account_target = '1541'
+
+   Example result: -800,000 (already negative)
+
+   Step 3: Add Both Components
+   ─────────────────────────
+   COGS = 1,600,000 + (-800,000) = 800,000
+
+WHAT EACH COMPONENT MEANS:
+
+   Production Costs (1,600,000):
+   - Money spent on raw materials, labor, factory overhead
+   - Actual CASH or EXPENSE incurred
+   - All costs for goods that will be/were sold
+
+   SDCK Adjustment (-800,000):
+   - Value of goods still on hand (inventory)
+   - These goods were NOT SOLD yet
+   - So subtract them from production costs
+   - Next month: this becomes "opening inventory"
+
+   Final COGS (800,000):
+   - Cost of goods that were ACTUALLY SOLD
+   - = Production costs - unsold inventory
+   - Used to calculate Gross Profit = Revenue - COGS
+
+EXAMPLE WITH REAL NUMBERS:
+
+   Scenario:
+   - Opening Inventory (Jan 1): 500,000 (from previous month's SDCK)
+   - Production Costs in February: 1,600,000 (from 154 t file)
+   - Goods Available for Sale: 500,000 + 1,600,000 = 2,100,000
+   - Ending Inventory (Feb 28): 800,000 (from SDCK 1541)
+   - COGS (what was sold): 2,100,000 - 800,000 = 1,300,000
+
+   System Calculation (simplified):
+   - COGS = Production Costs + SDCK
+   - COGS = 1,600,000 + (-800,000) = 800,000
+   - Note: The system doesn't require opening inventory because:
+     * SDCK stores the running inventory balance
+     * Each month's SDCK becomes next month's opening inventory
+     * The adjustment is automatic through accumulated SDCK
+
+COMMON MISTAKES:
+
+   ❌ MISTAKE: Using accounts from 911 t file for COGS
+   ✓ CORRECT: COGS comes ONLY from 154 t (6xx, 8xx) + SDCK
+
+   ❌ MISTAKE: Including parent codes (6, 62, 621)
+   ✓ CORRECT: Include ONLY leaf codes (6211, 6212, 6221, etc.)
+
+   ❌ MISTAKE: Forgetting SDCK adjustment
+   ✓ CORRECT: COGS = 154 t total + SDCK (which is negative)
+
+   ❌ MISTAKE: Using positive SDCK value
+   ✓ CORRECT: SDCK is stored and used as NEGATIVE
+
+   ❌ MISTAKE: Summing parent account amounts
+   ✓ CORRECT: Parent accounts are aggregates; sum only leaves
 
 
 P&L REPORT OUTPUT FORMAT
