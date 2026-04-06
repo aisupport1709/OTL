@@ -6,6 +6,7 @@ import pandas as pd
 from datetime import datetime
 from app import db
 from app.models.pl_entry import PLEntry
+from app.models.pl_sdck import PLSDCK
 
 COLUMN_MAP = {
     'Tk đ.ứng': 'account_code',
@@ -19,16 +20,23 @@ PARENT_CODES = {'511', '515', '642', '635', '711', '811', '154'}
 
 
 def detect_file_type(filename):
-    """Detect file type from filename: '911' or '154'."""
-    if '911' in filename:
+    """Detect file type from filename: '911', '154', or 'SDCK'."""
+    if 'SDCK' in filename.upper():
+        # Extract account number from SDCK filename: "SDCK 1541 01.02.2026"
+        match = re.search(r'SDCK\s+(\d+)', filename, re.IGNORECASE)
+        if match:
+            return ('SDCK', match.group(1))
+        else:
+            raise ValueError(f"Cannot extract account number from SDCK filename: '{filename}'")
+    elif '911' in filename:
         return '911'
     elif '154' in filename:
         return '154'
     else:
         raise ValueError(
             f"Cannot detect file type from filename: '{filename}'\n"
-            f"Filename must contain '911' or '154' and date pattern.\n"
-            f"Expected format: '911 t 01.02.2026-28.02.2026' or '154 t 01-02-2026-28-02-2026'"
+            f"Filename must contain '911', '154', or 'SDCK 1541' and date pattern.\n"
+            f"Expected format: '911 t 01.02.2026-28.02.2026' or 'SDCK 1541 01.02.2026-28.02.2026'"
         )
 
 
@@ -240,7 +248,15 @@ def import_pl_file(file_path, filename):
     Detects file type, extracts month/year, finds header row, and imports.
     Returns (success_count, error_count, errors).
     """
-    file_type = detect_file_type(filename)
+    file_type_result = detect_file_type(filename)
+
+    # Handle SDCK detection (returns tuple)
+    if isinstance(file_type_result, tuple):
+        file_type, account_target = file_type_result
+        return import_sdck_file(file_path, filename, account_target)
+    else:
+        file_type = file_type_result
+
     month, year = extract_month_year(filename)
     header_idx, skiprows = find_header_row(file_path)
 
@@ -251,6 +267,98 @@ def import_pl_file(file_path, filename):
     df = pd.read_excel(file_path, skiprows=skiprows, engine=engine)
 
     return _import_dataframe(df, file_type, month, year, filename)
+
+
+def import_sdck_file(file_path, filename, account_target):
+    """
+    Import SDCK (Số dư cuối kỳ / Ending Balance) data from an Excel file.
+    Format: Filename like "SDCK 1541 01.02.2026-28.02.2026"
+    Columns: "Tk", "Tên tk", "Ps nợ"
+
+    Returns (success_count, error_count, errors).
+    """
+    month, year = extract_month_year(filename)
+    header_idx, skiprows = find_header_row(file_path)
+
+    # Choose engine based on file extension
+    is_xls = file_path.lower().endswith('.xls')
+    engine = 'xlrd' if is_xls else 'openpyxl'
+
+    df = pd.read_excel(file_path, skiprows=skiprows, engine=engine)
+
+    success_count = 0
+    error_count = 0
+    errors = []
+
+    # Find columns
+    col_tk = None
+    col_ten = None
+    col_no = None
+
+    for col in df.columns:
+        col_str = str(col).strip().lower()
+        if 'tk' in col_str and col_tk is None:
+            col_tk = col
+        if 'tên' in col_str or 'ten' in col_str:
+            col_ten = col
+        if ('nợ' in col_str or 'no' in col_str) and col_no is None:
+            col_no = col
+
+    if not col_tk or not col_no:
+        errors.append(f"ERROR: Missing required columns. Expected: 'Tk', 'Tên tk', 'Ps nợ'")
+        return 0, len(errors), errors
+
+    for idx, row in df.iterrows():
+        try:
+            # Extract account code
+            account_code_raw = row.get(col_tk, '')
+            if pd.notna(account_code_raw):
+                code_str = str(account_code_raw).strip()
+                try:
+                    account_code = str(int(float(code_str)))
+                except (ValueError, TypeError):
+                    account_code = code_str
+            else:
+                account_code = ''
+
+            account_name = str(row.get(col_ten, '')).strip() if col_ten else ''
+            balance_raw = row.get(col_no, 0)
+
+            # Parse balance as float and convert to negative (for Ps Nợ)
+            try:
+                balance = -float(balance_raw) if pd.notna(balance_raw) else 0
+            except (ValueError, TypeError):
+                balance = 0
+
+            # Skip empty rows
+            if not account_code or balance == 0:
+                continue
+
+            # Create SDCK entry
+            entry = PLSDCK(
+                source_file=filename,
+                account_target=account_target,
+                month=month,
+                year=year,
+                account_code=account_code,
+                account_name=account_name,
+                balance=balance,
+                imported_at=datetime.utcnow(),
+            )
+
+            db.session.add(entry)
+            success_count += 1
+
+        except Exception as e:
+            error_count += 1
+            errors.append(f"Row {idx + 1}: {str(e)}")
+
+    db.session.commit()
+
+    if success_count > 0:
+        errors.append(f"INFO: Imported {success_count} SDCK entries for account {account_target}")
+
+    return success_count, error_count, errors[:20]
 
 
 def import_pl_google_sheet(url, month=None, year=None):
@@ -532,6 +640,26 @@ def calculate_pl(year):
                     'value': 0
                 }
             month_data['sub_accounts'][line_item][code]['value'] += value
+
+    # Process SDCK (Số dư cuối kỳ / Ending Balance) data - add to COGS
+    sdck_entries = PLSDCK.query.filter_by(year=year).all()
+    for entry in sdck_entries:
+        if entry.month in monthly_data:
+            month_data = monthly_data[entry.month]
+            # SDCK data represents ending balance of accounts, add to COGS
+            line_item = 'Giá vốn hàng bán'
+            code = str(entry.account_code).strip()
+            value = entry.balance  # Already negative if needed
+
+            if value != 0:
+                month_data['totals'][line_item] += value
+
+                if code not in month_data['sub_accounts'][line_item]:
+                    month_data['sub_accounts'][line_item][code] = {
+                        'name': entry.account_name or '',
+                        'value': 0
+                    }
+                month_data['sub_accounts'][line_item][code]['value'] += value
 
     # Calculate P&L metrics for each month
     result = {}

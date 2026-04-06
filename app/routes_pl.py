@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, request, jsonify, current_app, sen
 from werkzeug.utils import secure_filename
 from app import db
 from app.models.pl_entry import PLEntry
+from app.models.pl_sdck import PLSDCK
 from app.services.pl_import import (
     import_pl_file, import_pl_google_sheet, calculate_pl, get_available_years
 )
@@ -391,6 +392,7 @@ def export_pl_report():
 def delete_all_pl_data():
     try:
         PLEntry.query.delete()
+        PLSDCK.query.delete()
         db.session.commit()
         return jsonify({'message': 'All P&L data deleted'})
     except Exception as e:
