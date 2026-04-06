@@ -6,13 +6,17 @@
 PROJECT OVERVIEW
 ================================================================================
 The OTL P&L Report application is a specialized financial reporting tool that
-processes Vietnamese accounting data (from "911 t" and "154 t" files) and
-generates comprehensive Profit & Loss (P&L) statements on a monthly and annual
-basis.
+processes Vietnamese accounting data (from "911 t", "154 t", and "SDCK 1541"
+files) and generates comprehensive Profit & Loss (P&L) statements on a monthly
+and annual basis.
 
-The system automatically identifies and aggregates financial data by leaf-node
-account codes (excluding parent/summary accounts) and calculates all key P&L
-metrics following standard accounting principles.
+The system automatically:
+  1. Imports three types of accounting files (911 t, 154 t, SDCK 1541)
+  2. Identifies and aggregates financial data by leaf-node account codes
+     (excluding parent/summary accounts to prevent double-counting)
+  3. Calculates COGS using the inventory formula: Production Costs + Inventory
+     Adjustment (SDCK)
+  4. Computes all P&L metrics following standard Vietnamese accounting principles
 
 
 SYSTEM REQUIREMENTS
@@ -22,10 +26,29 @@ SYSTEM REQUIREMENTS
    - Excel files (.xlsx, .xls)
    - Google Sheets (publicly accessible links)
 
-2. SUPPORTED FILE TYPES
-   - "911 t" (P&L Aggregation) - Contains revenue and expense accounts
-   - "154 t" (Cost of Production) - Contains COGS accounts
-   - "SDCK 1541" (Ending Balance) - Ending inventory balance data
+2. SUPPORTED FILE TYPES (THREE REQUIRED)
+
+   File 1: "911 t" (P&L Aggregation)
+   - Purpose: Contains main revenue and operating expense accounts
+   - Source: Monthly P&L statement from accounting system
+   - Accounts: 5xx (revenue), 6xx (production costs), 8xx (cost adjustments),
+              642x (operating expenses), 635x (finance costs), 711x/811x (other income/expenses)
+   - Columns: Tk đ.ứng (code), Tên tk đ.ứng (name), Ps nợ (debit), Ps có (credit)
+
+   File 2: "154 t" (Cost of Production)
+   - Purpose: Contains detailed production/manufacturing cost accounts
+   - Source: Cost accounting report from production department
+   - Accounts: 6xx (raw materials, labor, overhead), 8xx (cost adjustments)
+   - Use: Aggregated as COGS (Giá vốn hàng bán)
+   - Columns: Tk đ.ứng (code), Tên tk đ.ứng (name), Ps nợ (debit), Ps có (credit)
+
+   File 3: "SDCK 1541" (Số dư cuối kỳ - Ending Balance)
+   - Purpose: Ending inventory balance adjustment for COGS calculation
+   - Source: Inventory reconciliation at month-end
+   - Account: 1541 (Inventory account)
+   - Use: Added to COGS formula as inventory adjustment
+   - Columns: Tk (code), Tên tk (name), Ps nợ (debit - the ending balance)
+   - Formula: COGS = Sum(6xx, 8xx from 154 t) + SDCK (negative adjustment)
 
 3. FILENAME REQUIREMENTS
    - Must contain date pattern: DD.MM.YYYY or DD-MM-YYYY
@@ -117,12 +140,33 @@ STEP 1: IDENTIFY ACCOUNT GROUPS (By Prefix)
    - 811x (File: 911 t) → Chi phí khác (Other Expenses)      [Use: Ps Nợ]
 
 
-STEP 2: AGGREGATE LEAF-NODE AMOUNTS
+STEP 2: HANDLE THREE FILE TYPES
+
+   File "911 t" Processing:
+   - Filter accounts by prefix: 511x, 515x, 642x, 635x, 711x, 811x
+   - Identify leaf nodes for each prefix group
+   - Use Ps Có (credit) for revenue accounts (511x, 515x, 711x)
+   - Use Ps Nợ (debit) for expense accounts (642x, 635x, 811x)
+
+   File "154 t" Processing:
+   - Filter accounts by prefix: 6xx, 8xx (production costs)
+   - Identify leaf nodes (accounts with no children)
+   - Use Ps Nợ (debit) - cost accounts
+   - Aggregate as single "Giá vốn hàng bán" line item
+
+   File "SDCK 1541" Processing:
+   - Extract account codes and ending balance amounts
+   - Convert balance to negative (inventory adjustment)
+   - Add DIRECTLY to COGS total (not as sub-account breakdown)
+   - Example: SDCK balance of 300,000 → adds -300,000 to COGS
+
+STEP 2B: AGGREGATE LEAF-NODE AMOUNTS
 
    For each (month, file_type, account_prefix) group:
-   1. Identify all accounts
+   1. Identify all accounts from file
    2. Calculate leaf nodes (accounts with no children)
    3. Sum ONLY leaf-node values, NOT parent account totals
+   4. For SDCK: Simply add adjustment value to COGS total
 
 
 STEP 3: CALCULATE P&L LINE ITEMS (Sequential)
@@ -132,6 +176,7 @@ STEP 3: CALCULATE P&L LINE ITEMS (Sequential)
 
    Line 2: Giá vốn hàng bán (Cost of Goods Sold - COGS)
    = Sum of Ps Nợ from all leaf codes (6xx, 8xx) in "154 t" file
+     + SDCK 1541 ending inventory adjustment (negative value)
 
    Line 3: Lợi nhuận gộp (Gross Profit)
    = Doanh thu thuần - Giá vốn hàng bán
@@ -262,22 +307,43 @@ USAGE:
 DATA IMPORT WORKFLOW
 ================================================================================
 
-STEP 1: UPLOAD FILES
-   - Go to /pl/import → "Import Data" button
-   - Upload "911 t" and "154 t" Excel files
-   - Or paste Google Sheets URLs
-   - Files must have correct filename date format
+STEP 1: UPLOAD THREE FILES
+   - Go to /pl/import → "Import Data" section
+   - Upload all three file types:
+     * "911 t" (P&L Aggregation) - required for revenue/expenses
+     * "154 t" (Cost of Production) - required for COGS base
+     * "SDCK 1541" (Ending Inventory) - required for COGS adjustment
+   - Can upload as Excel files (.xlsx, .xls) or paste Google Sheets URLs
+   - All files must have valid filename date format
 
-STEP 2: SYSTEM PROCESSES
-   - Detects file type (911 or 154) from filename
+STEP 2: SYSTEM PROCESSES EACH FILE TYPE
+
+   For "911 t" files:
+   - Detects file type from filename
    - Extracts month/year from date in filename
    - Finds header row automatically
-   - Maps columns by name (with positional fallback)
-   - Filters for leaf-node accounts only
+   - Maps columns by name (case-insensitive with positional fallback)
+   - Filters for leaf-node accounts only per prefix group
    - Converts numeric codes (removes .0 float suffix)
    - Strips empty rows (both debit and credit = 0)
-   - Deletes previous data for same month/year/file_type (upsert)
-   - Stores all valid account entries in pl_entry table
+   - Deletes previous data for same month/year (upsert)
+   - Stores valid entries in pl_entry table with file_type='911'
+
+   For "154 t" files:
+   - Same process as 911 t
+   - Identifies accounts starting with 6 or 8
+   - Filters for leaf nodes (accounts with no children)
+   - All debit values contribute to COGS calculation
+   - Stores in pl_entry table with file_type='154'
+
+   For "SDCK 1541" files:
+   - Detects file type from "SDCK 1541" in filename
+   - Extracts account_target = "1541"
+   - Reads account codes, names, and ending balances
+   - Converts balances to NEGATIVE (for formula: costs - inventory)
+   - Stores in pl_sdck table (separate from pl_entry)
+   - Does NOT perform leaf-node filtering
+   - Each sub-account balance stored individually
 
 STEP 3: VERIFY IN REPORT
    - Go to /pl/ (P&L Report)
@@ -322,6 +388,97 @@ EXAMPLE:
    Lợi nhuận gộp           |        |(400,000,000)|(450,000,000)| ... |(4,800,000,000)
 
 
+SDCK CALCULATION DETAILS
+================================================================================
+
+WHAT IS SDCK?
+   SDCK = Số dư cuối kỳ (Ending Balance)
+   - Month-end balance of inventory account (1541)
+   - Represents the value of goods on hand at period close
+   - Used to adjust COGS in Vietnamese accounting
+
+WHY IS SDCK NEEDED?
+   Vietnamese COGS formula follows the inventory adjustment method:
+
+   COGS = Opening Inventory + Production Costs - Ending Inventory (SDCK)
+
+   Example with January data:
+   - Opening Inventory (Jan 1): 500,000
+   - Production Costs (154 t): 2,000,000
+   - Ending Inventory (SDCK Jan 31): 300,000
+   - COGS = 500,000 + 2,000,000 - 300,000 = 2,200,000
+
+HOW SDCK DATA IS STRUCTURED
+
+   SDCK File Format:
+   - Filename: "SDCK 1541 28.02.2026.xlsx"
+   - Contains: Ending balance of all sub-accounts under 1541
+   - Date: Month-end date of the period
+
+   Example SDCK File Columns:
+   | Tk (Code) | Tên tk (Name)        | Ps nợ (Balance) |
+   | 154101    | Raw Materials        | 300,000         |
+   | 154102    | Work in Progress     | 100,000         |
+   | 154103    | Finished Goods       | 200,000         |
+   | (TOTAL)   |                      | 600,000         |
+
+HOW SDCK IS PROCESSED
+
+   Step 1: Extract from File
+   - Read each row: account code, account name, balance amount
+   - Extract month/year from filename date (e.g., 28.02.2026 → Month 2)
+   - Store with account_target = "1541"
+
+   Step 2: Convert to Negative
+   - Original balance: 600,000 (debit side representation)
+   - System converts: balance = -float(600,000) = -600,000
+   - Reason: In COGS formula, ending inventory is SUBTRACTED
+   - Formula: COGS = Production Costs - Ending Inventory = Costs + (-Inventory)
+
+   Step 3: Add to COGS Total
+   - Query all SDCK entries for the year
+   - For each month, add SDCK balance to "Giá vốn hàng bán" total
+   - Example:
+     * Production Costs (154 t): 2,000,000
+     * SDCK adjustment: -300,000 (stored as negative)
+     * Final COGS: 2,000,000 + (-300,000) = 1,700,000
+
+DATABASE STORAGE
+   Table: pl_sdck
+   - source_file: "SDCK 1541 28.02.2026.xlsx"
+   - account_target: "1541"
+   - month: 2
+   - year: 2026
+   - account_code: "154101" (sub-account under 1541)
+   - account_name: "Raw Materials"
+   - balance: -300000 (stored as negative for calculation)
+
+EXAMPLE: COMPLETE COGS CALCULATION
+
+   Given:
+   - 154 t file (Feb 2026) contains:
+     * Account 6211 (Materials): 1,000,000 (Ps nợ)
+     * Account 6221 (Labor): 500,000 (Ps nợ)
+     * Account 8111 (Factory OH): 200,000 (Ps nợ)
+
+   - SDCK 1541 file (28.02.2026) contains:
+     * Total inventory: 400,000
+
+   Calculation:
+   1. Sum leaf accounts from 154 t: 1,000,000 + 500,000 + 200,000 = 1,700,000
+   2. Add SDCK adjustment: 1,700,000 + (-400,000) = 1,300,000
+   3. Final COGS = 1,300,000
+
+IMPORTANT NOTES
+
+   ✓ SDCK is OPTIONAL if ending inventory is zero
+   ✓ SDCK balance is stored as NEGATIVE to align with formula
+   ✓ Multiple SDCK entries per month (sub-accounts) are summed together
+   ✓ SDCK accounts (e.g., 154101, 154102) are NOT displayed as P&L sub-accounts
+     (they are aggregated into the single COGS adjustment)
+   ✓ If no SDCK file is imported, COGS = Sum of 154 t file only (no adjustment)
+
+
 DATABASE SCHEMA
 ================================================================================
 
@@ -343,6 +500,22 @@ INDEXES:
 UNIQUE CONSTRAINT: None
    - Multiple entries can exist for same code (across different months/years)
    - Same month/year/file_type/code: Previous entry is deleted on re-import (upsert)
+
+TABLE: pl_sdck
+   id (Integer, Primary Key, Auto-increment)
+   source_file (String 255): Original filename (e.g., "SDCK 1541 28.02.2026.xlsx")
+   account_target (String 10): Target account code (e.g., "1541")
+   month (Integer): 1-12
+   year (Integer): e.g., 2026
+   account_code (String 20, Indexed): Sub-account code (e.g., "154101")
+   account_name (String 255): Sub-account description
+   balance (Float): Ending balance (stored as NEGATIVE for calculation)
+   imported_at (DateTime): Import timestamp
+
+RELATIONSHIP TO COGS:
+   - All SDCK entries for a given month are summed
+   - The total is added to COGS line item automatically
+   - Not displayed as individual sub-account rows
 
 TABLE: account_mapping
    id (Integer, Primary Key, Auto-increment)
@@ -376,21 +549,42 @@ KNOWN LIMITATIONS & DESIGN NOTES
    - Allows flexibility: same code can be parent in one month, leaf in another
    - Parent accounts are automatically excluded (never displayed or calculated)
 
-4. COGS FROM "154 t" FILE
-   - ALL accounts starting with 6 or 8 in "154 t" file treated as COGS
+4. COGS CALCULATION (FROM "154 t" + SDCK)
+   - Base COGS: ALL accounts starting with 6 or 8 in "154 t" file
+   - Adjustment: SDCK 1541 ending inventory (stored as negative)
+   - Final COGS = Sum of leaf codes in 154 t + SDCK adjustment
    - No specific "154x" account code needed
    - File type "154 t" designation indicates cost accounts
 
-5. ZERO HANDLING
+5. SDCK FILE REQUIREMENTS
+   - Filename must contain "SDCK 1541" and valid date (DD.MM.YYYY)
+   - Example: "SDCK 1541 28.02.2026.xlsx"
+   - Columns: Tk (code), Tên tk (name), Ps nợ (balance)
+   - Balance stored as negative for calculation
+   - Optional: If no SDCK imported, COGS = 154 t only (no adjustment)
+
+6. ZERO HANDLING
    - Rows with both debit and credit = 0 are skipped at import
+   - SDCK rows with balance = 0 are skipped
    - Annual totals of 0 are displayed as "-" in Excel
    - Zero values don't break calculations
 
-6. DUPLICATE HANDLING ON RE-IMPORT
+7. DUPLICATE HANDLING ON RE-IMPORT
    - Previous data for same (month, year, file_type) is deleted
    - New data inserted
+   - SDCK data for same (month, year, account_target) is replaced
    - Prevents duplicate sub-account rows
    - Safe to re-import with corrections
+
+8. THREE FILE TYPES INDEPENDENCE
+   - Each file type is imported separately (can upload in any order)
+   - 911 t and 154 t share same pl_entry table (different file_type)
+   - SDCK uses separate pl_sdck table
+   - Can update one file type without re-uploading others
+   - System handles missing files gracefully:
+     * Missing 911 t: P&L lines without 911 data = 0
+     * Missing 154 t: COGS = SDCK adjustment only
+     * Missing SDCK: COGS = 154 t total (no inventory adjustment)
 
 
 TROUBLESHOOTING
@@ -420,20 +614,43 @@ ISSUE: Google Sheets import fails
 CAUSE: Sheet not publicly accessible, or URL format invalid
 FIX: Check share settings (Share → Anyone with link), verify URL format
 
+ISSUE: COGS value seems incorrect or doesn't match expected
+CAUSE: Missing SDCK file, or SDCK balance is wrong
+FIX: Verify SDCK 1541 file is imported. Check ending inventory balance.
+     COGS = 154 t total + SDCK (negative), not just 154 t alone.
+
+ISSUE: SDCK import shows "already exists" errors
+CAUSE: SDCK file imported twice with same month/year
+FIX: System performs upsert on SDCK. Check database for duplicate entries.
+     Safe to re-import with corrected balance values.
+
+ISSUE: Different COGS value between web report and Excel export
+CAUSE: Timing issue or unsaved SDCK data
+FIX: Ensure all three files (911t, 154t, SDCK) are fully imported.
+     Wait for import confirmation before generating export.
+     Refresh browser and re-generate export.
+
 
 VERSION HISTORY
 ================================================================================
 
 v1.0 (Current)
-- Core P&L calculation engine
-- Excel/Google Sheets import
+- Core P&L calculation engine with three file types:
+  * 911 t (Revenue & Operating Expenses)
+  * 154 t (Production Costs)
+  * SDCK 1541 (Inventory Adjustment for COGS)
+- COGS formula: Production Costs (154 t) + Inventory Adjustment (SDCK)
+- Excel/Google Sheets import for all three file types
 - Sub-account filtering (leaf-node detection)
 - Account mapping feature
 - Web interface with monthly breakdown
 - Excel export with formatting
 - Browser table view with sticky columns
-- Account code to integer string conversion
+- Account code to integer string conversion (removes .0 suffix)
 - Upsert on re-import (no duplicate accumulation)
+- Separate storage: pl_entry (911t/154t), pl_sdck (inventory balances)
+- Auto-detection of file type from filename
+- Graceful handling of missing files
 
 
 TECHNICAL STACK
@@ -487,10 +704,37 @@ FOR MORE INFORMATION
 ================================================================================
 
 - Application: /pl/ (P&L Report Dashboard)
-- Import Data: /pl/import
+- Import Data: /pl/import (upload 911t, 154t, SDCK 1541 files)
 - Source Code: app/routes_pl.py, app/services/pl_import.py
 - Templates: app/templates/pl/
-- Models: app/models/pl_entry.py, app/models/account_mapping.py
+- Models:
+  * app/models/pl_entry.py (stores 911t and 154t data)
+  * app/models/pl_sdck.py (stores inventory ending balances)
+  * app/models/account_mapping.py (stores local→HQ code mappings)
+
+QUICK START CHECKLIST
+================================================================================
+
+1. ☐ Prepare three Excel files:
+   - "911 t 01.02.2026-28.02.2026.xlsx" (P&L data)
+   - "154 t 01.02.2026-28.02.2026.xlsx" (Production costs)
+   - "SDCK 1541 28.02.2026.xlsx" (Ending inventory)
+
+2. ☐ Verify columns in each file:
+   - 911t/154t: Tk đ.ứng | Tên tk đ.ứng | Ps nợ | Ps có
+   - SDCK: Tk | Tên tk | Ps nợ
+
+3. ☐ Upload all files via /pl/import → Import Data
+   - Supports batch upload
+   - Can upload individually in any order
+
+4. ☐ Go to /pl/ → Select year → View P&L Report
+   - Verify main line items and sub-accounts appear
+   - Check COGS includes both 154t costs and SDCK adjustment
+
+5. ☐ Export to Excel (optional)
+   - Click "Export Excel" button
+   - Downloads formatted .xlsx with all data
 
 ================================================================================
                               END OF README
