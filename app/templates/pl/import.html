@@ -2,64 +2,118 @@
 {% block title %}Import P&L Data - OTL P&L{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-between mb-6">
-    <h2 class="text-2xl font-bold text-gray-800"><i class="bi bi-cloud-upload"></i> Import P&L Data</h2>
-    <div class="flex gap-3">
-        <button onclick="openImportModal()" id="btn-import-modal"
-            class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-5 rounded-lg transition shadow text-sm">
-            <i class="bi bi-plus-lg"></i> Import Data
-        </button>
-        <button onclick="deleteAllData()"
-            class="border border-red-300 text-red-600 hover:bg-red-50 font-medium py-2 px-5 rounded-lg transition text-sm">
-            <i class="bi bi-trash"></i> Clear All Data
-        </button>
+<h2 class="text-2xl font-bold text-gray-800 mb-8"><i class="bi bi-cloud-upload"></i> Import & Map P&L Data</h2>
+
+<!-- SECTION 1: Import Local PL Data -->
+<div class="bg-white rounded-xl shadow-sm mb-8">
+    <div class="px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-semibold text-gray-800"><i class="bi bi-file-earmark-spreadsheet"></i> Import Local PL Data</h3>
+        <p class="text-sm text-gray-500 mt-1">Import P&L files (911 t and 154 t). Filename must contain date pattern (e.g., "911 t 01.02.2026-28.02.2026")</p>
+    </div>
+    <div class="p-6">
+        <div class="flex gap-3 mb-6">
+            <button onclick="openPLImportModal()"
+                class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-5 rounded-lg transition shadow text-sm">
+                <i class="bi bi-upload"></i> Import Data
+            </button>
+            <button onclick="clearPLData()"
+                class="inline-flex items-center gap-2 border border-red-300 text-red-600 hover:bg-red-50 font-medium py-2 px-5 rounded-lg transition text-sm">
+                <i class="bi bi-trash"></i> Clear All Data
+            </button>
+        </div>
+        <div id="pl-status" class="text-sm text-gray-500">Ready to import P&L data</div>
+        <div id="pl-result" class="mt-4 hidden"></div>
     </div>
 </div>
 
-<div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-    <p class="text-sm text-amber-800"><strong>File Format:</strong> Accept "911 t" (P&L aggregation) and "154 t" (Cost of production) files. Filename must contain date pattern (e.g., "911 t 01.02.2026-28.02.2026")</p>
-</div>
-
-<!-- Import Modal -->
-<div id="import-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-96 overflow-y-auto">
-        <!-- Header -->
-        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
-            <h3 class="text-lg font-semibold text-gray-800">Import Multiple Data Sources</h3>
-            <button onclick="closeImportModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+<!-- SECTION 2: Import & Map Account Codes -->
+<div class="bg-white rounded-xl shadow-sm">
+    <div class="px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-semibold text-gray-800"><i class="bi bi-link-45deg"></i> Map Local Account Code to HQ Account</h3>
+        <p class="text-sm text-gray-500 mt-1">Import account mappings from Excel or Google Sheets, then edit and manage them</p>
+    </div>
+    <div class="p-6">
+        <div class="flex gap-3 mb-6">
+            <button onclick="openMappingImportModal()"
+                class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-5 rounded-lg transition shadow text-sm">
+                <i class="bi bi-upload"></i> Import Mapping
+            </button>
+            <button onclick="openMappingEditModal()"
+                class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-5 rounded-lg transition shadow text-sm">
+                <i class="bi bi-pencil-square"></i> Edit Mapping
+            </button>
+            <button onclick="exportMappingData()"
+                class="inline-flex items-center gap-2 border border-emerald-300 text-emerald-600 hover:bg-emerald-50 font-medium py-2 px-5 rounded-lg transition text-sm">
+                <i class="bi bi-download"></i> Export
+            </button>
+            <button onclick="clearMappingData()"
+                class="inline-flex items-center gap-2 border border-red-300 text-red-600 hover:bg-red-50 font-medium py-2 px-5 rounded-lg transition text-sm">
+                <i class="bi bi-trash"></i> Clear All
+            </button>
         </div>
 
-        <!-- Content -->
+        <!-- Mapping Table -->
+        <div class="border border-gray-200 rounded-lg overflow-hidden">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-700">Local Code</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-700">HQ Code</th>
+                        <th class="px-4 py-3 text-center font-semibold text-gray-700 w-20">Count</th>
+                    </tr>
+                </thead>
+                <tbody id="mappings-tbody">
+                    <tr>
+                        <td colspan="3" class="px-4 py-4 text-center text-gray-500">No mappings yet. Import or add mappings to get started.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div id="mapping-result" class="mt-4 hidden"></div>
+    </div>
+</div>
+
+<!-- ===== MODALS ===== -->
+
+<!-- Modal: Import Local PL Data -->
+<div id="pl-import-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+            <h3 class="text-lg font-semibold text-gray-800">Import Local PL Data</h3>
+            <button onclick="closePLImportModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+        </div>
+
         <div class="p-6 space-y-6">
-            <!-- Tab Buttons -->
+            <!-- Tabs -->
             <div class="flex gap-0 bg-gray-200 p-1 rounded-lg">
-                <button type="button" onclick="switchImportTab('files')"
-                    id="tab-files" class="flex-1 py-2 px-4 text-sm font-medium text-white bg-emerald-600 rounded-md transition">
+                <button type="button" onclick="switchPLTab('files')"
+                    id="pl-tab-files" class="flex-1 py-2 px-4 text-sm font-medium text-white bg-emerald-600 rounded-md transition">
                     <i class="bi bi-file-earmark-excel"></i> Excel Files
                 </button>
-                <button type="button" onclick="switchImportTab('sheets')"
-                    id="tab-sheets" class="flex-1 py-2 px-4 text-sm font-medium text-gray-700 hover:text-gray-900 transition">
+                <button type="button" onclick="switchPLTab('sheets')"
+                    id="pl-tab-sheets" class="flex-1 py-2 px-4 text-sm font-medium text-gray-700 hover:text-gray-900 transition">
                     <i class="bi bi-google"></i> Google Sheets
                 </button>
             </div>
 
             <!-- Excel Files Tab -->
-            <div id="tab-content-files" class="space-y-4">
+            <div id="pl-tab-content-files" class="space-y-4">
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p class="text-xs text-blue-800"><strong>Tip:</strong> Select multiple Excel files (.xlsx, .xls). Filename must contain date pattern like "911 t 01.02.2026-28.02.2026"</p>
+                    <p class="text-xs text-blue-800"><strong>Format:</strong> Filename like "911 t 01.02.2026-28.02.2026" or "154 t 01.02.2026-28.02.2026"</p>
                 </div>
                 <div>
-                    <label for="file-input-multi" class="block text-sm font-medium text-gray-700 mb-2">Select Excel Files</label>
-                    <input type="file" id="file-input-multi" name="files" accept=".xlsx,.xls" multiple
+                    <label for="pl-file-input" class="block text-sm font-medium text-gray-700 mb-2">Select Excel Files</label>
+                    <input type="file" id="pl-file-input" accept=".xlsx,.xls" multiple
                         class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 border border-gray-300 rounded-lg cursor-pointer">
                 </div>
-                <div id="file-list" class="space-y-2"></div>
+                <div id="pl-file-list" class="text-sm text-gray-500">No files selected</div>
                 <div class="flex gap-3">
-                    <button type="button" onclick="importSelectedFiles()"
-                        class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-5 rounded-lg transition text-sm">
+                    <button type="button" onclick="importPLFiles()"
+                        class="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-5 rounded-lg transition text-sm">
                         <i class="bi bi-upload"></i> Import Selected Files
                     </button>
-                    <button type="button" onclick="closeImportModal()"
+                    <button type="button" onclick="closePLImportModal()"
                         class="flex-1 border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-5 rounded-lg transition text-sm">
                         Cancel
                     </button>
@@ -67,23 +121,21 @@
             </div>
 
             <!-- Google Sheets Tab -->
-            <div id="tab-content-sheets" class="hidden space-y-4">
+            <div id="pl-tab-content-sheets" class="hidden space-y-4">
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p class="text-xs text-blue-800"><strong>Tip:</strong> Name your sheet with a date pattern like "911 t 01.02.2026-28.02.2026". Sheet must be publicly shared (Share → Anyone with the link).</p>
+                    <p class="text-xs text-blue-800"><strong>Format:</strong> Sheet name like "911 t 01.02.2026-28.02.2026". Sheet must be publicly shared.</p>
                 </div>
-                <div id="sheets-container" class="space-y-3">
-                    <!-- URL inputs will be added here -->
-                </div>
-                <button type="button" onclick="addSheetURL()"
+                <div id="pl-sheets-container" class="space-y-3"></div>
+                <button type="button" onclick="addPLSheetURL()"
                     class="w-full border border-dashed border-emerald-400 text-emerald-700 hover:bg-emerald-50 font-medium py-2 px-5 rounded-lg transition text-sm">
                     <i class="bi bi-plus-lg"></i> Add Another Sheet URL
                 </button>
                 <div class="flex gap-3">
-                    <button type="button" onclick="importSelectedSheets()"
-                        class="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-5 rounded-lg transition text-sm">
+                    <button type="button" onclick="importPLSheets()"
+                        class="flex-1 inline-flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-5 rounded-lg transition text-sm">
                         <i class="bi bi-cloud-download"></i> Import Sheets
                     </button>
-                    <button type="button" onclick="closeImportModal()"
+                    <button type="button" onclick="closePLImportModal()"
                         class="flex-1 border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-5 rounded-lg transition text-sm">
                         Cancel
                     </button>
@@ -91,7 +143,7 @@
             </div>
 
             <!-- Progress -->
-            <div id="import-progress" class="hidden">
+            <div id="pl-import-progress" class="hidden">
                 <div class="w-full bg-gray-200 rounded-full h-2.5">
                     <div class="bg-emerald-600 h-2.5 rounded-full animate-pulse" style="width: 100%"></div>
                 </div>
@@ -99,362 +151,315 @@
             </div>
 
             <!-- Results -->
-            <div id="import-results" class="hidden space-y-2"></div>
+            <div id="pl-import-results" class="hidden space-y-2"></div>
         </div>
     </div>
 </div>
 
-<!-- Account Mapping Section -->
-<div class="mt-8 bg-white rounded-xl shadow-sm">
-    <div class="px-6 py-4 border-b border-gray-100 font-semibold text-sm text-gray-700">
-        <i class="bi bi-link-45deg"></i> Map Local Account Code to HQ Account
-    </div>
-    <div class="p-6">
-        <p class="text-sm text-gray-500 mb-4">Map your local account codes to HQ account codes for consolidation.</p>
+<!-- Modal: Import Mapping Data -->
+<div id="mapping-import-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+            <h3 class="text-lg font-semibold text-gray-800">Import Account Mappings</h3>
+            <button onclick="closeMappingImportModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+        </div>
 
-        <div class="space-y-4">
-            <div class="flex gap-3 items-end">
-                <div class="flex-1">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Local Account Code</label>
-                    <input type="text" id="local-code" placeholder="e.g., 5111"
-                        class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none">
-                </div>
-                <div class="flex-1">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">HQ Account Code</label>
-                    <input type="text" id="hq-code" placeholder="e.g., 50001"
-                        class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none">
-                </div>
-                <button onclick="addAccountMapping()"
-                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-5 rounded-lg transition text-sm">
-                    <i class="bi bi-plus-lg"></i> Add Mapping
+        <div class="p-6 space-y-6">
+            <!-- Tabs -->
+            <div class="flex gap-0 bg-gray-200 p-1 rounded-lg">
+                <button type="button" onclick="switchMappingTab('files')"
+                    id="mapping-tab-files" class="flex-1 py-2 px-4 text-sm font-medium text-white bg-emerald-600 rounded-md transition">
+                    <i class="bi bi-file-earmark-excel"></i> Excel Files
+                </button>
+                <button type="button" onclick="switchMappingTab('sheets')"
+                    id="mapping-tab-sheets" class="flex-1 py-2 px-4 text-sm font-medium text-gray-700 hover:text-gray-900 transition">
+                    <i class="bi bi-google"></i> Google Sheets
                 </button>
             </div>
 
-            <!-- Existing Mappings Table -->
+            <!-- Excel Files Tab -->
+            <div id="mapping-tab-content-files" class="space-y-4">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p class="text-xs text-blue-800"><strong>Format:</strong> Excel with 2 columns: "Account code" and "Map to HQ account"</p>
+                </div>
+                <div>
+                    <label for="mapping-file-input" class="block text-sm font-medium text-gray-700 mb-2">Select Excel Files</label>
+                    <input type="file" id="mapping-file-input" accept=".xlsx,.xls" multiple
+                        class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 border border-gray-300 rounded-lg cursor-pointer">
+                </div>
+                <div id="mapping-file-list" class="text-sm text-gray-500">No files selected</div>
+                <div class="flex gap-3">
+                    <button type="button" onclick="importMappingFiles()"
+                        class="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-5 rounded-lg transition text-sm">
+                        <i class="bi bi-upload"></i> Import Selected Files
+                    </button>
+                    <button type="button" onclick="closeMappingImportModal()"
+                        class="flex-1 border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-5 rounded-lg transition text-sm">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+
+            <!-- Google Sheets Tab -->
+            <div id="mapping-tab-content-sheets" class="hidden space-y-4">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p class="text-xs text-blue-800"><strong>Format:</strong> Google Sheet with 2 columns: "Account code" and "Map to HQ account"</p>
+                </div>
+                <div id="mapping-sheets-container" class="space-y-3"></div>
+                <button type="button" onclick="addMappingSheetURL()"
+                    class="w-full border border-dashed border-emerald-400 text-emerald-700 hover:bg-emerald-50 font-medium py-2 px-5 rounded-lg transition text-sm">
+                    <i class="bi bi-plus-lg"></i> Add Another Sheet URL
+                </button>
+                <div class="flex gap-3">
+                    <button type="button" onclick="importMappingSheets()"
+                        class="flex-1 inline-flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-5 rounded-lg transition text-sm">
+                        <i class="bi bi-cloud-download"></i> Import Sheets
+                    </button>
+                    <button type="button" onclick="closeMappingImportModal()"
+                        class="flex-1 border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-5 rounded-lg transition text-sm">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+
+            <!-- Progress -->
+            <div id="mapping-import-progress" class="hidden">
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div class="bg-emerald-600 h-2.5 rounded-full animate-pulse" style="width: 100%"></div>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Importing mappings...</p>
+            </div>
+
+            <!-- Results -->
+            <div id="mapping-import-results" class="hidden space-y-2"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Edit Mapping Data -->
+<div id="mapping-edit-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+            <h3 class="text-lg font-semibold text-gray-800">Edit Account Mappings</h3>
+            <button onclick="closeMappingEditModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+        </div>
+
+        <div class="p-6 space-y-4">
+            <!-- Add New Mapping -->
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-3">
+                <h4 class="font-semibold text-gray-800 text-sm">Add New Mapping</h4>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Local Code</label>
+                        <input type="text" id="edit-local-code" placeholder="e.g., 5111"
+                            class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">HQ Code</label>
+                        <input type="text" id="edit-hq-code" placeholder="e.g., 50001"
+                            class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">&nbsp;</label>
+                        <button onclick="addMapping()"
+                            class="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-3 rounded-lg transition text-sm">
+                            <i class="bi bi-plus-lg"></i> Add
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mappings Table -->
             <div class="border border-gray-200 rounded-lg overflow-hidden">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 border-b border-gray-200">
                         <tr>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700">Local Code</th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700">HQ Code</th>
-                            <th class="px-4 py-3 text-center font-semibold text-gray-700">Action</th>
+                            <th class="px-4 py-3 text-center font-semibold text-gray-700 w-24">Action</th>
                         </tr>
                     </thead>
-                    <tbody id="mappings-tbody">
+                    <tbody id="edit-mappings-tbody">
                         <tr>
-                            <td colspan="3" class="px-4 py-4 text-center text-gray-500">No mappings yet. Add one to get started.</td>
+                            <td colspan="3" class="px-4 py-4 text-center text-gray-500">No mappings. Add one above.</td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <div class="flex gap-3">
+                <button type="button" onclick="closeMappingEditModal()"
+                    class="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-5 rounded-lg transition text-sm">
+                    <i class="bi bi-check-lg"></i> Done
+                </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Delete Result -->
-<div id="delete-result" class="mt-6 hidden"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-let urlInputCount = 0;
+const mappingsData = {};
+let plUrlInputCount = 0;
+let mappingUrlInputCount = 0;
 
-// ─── Import Modal ───────────────────────────────────────────────────
-function openImportModal() {
-    document.getElementById('import-modal').classList.remove('hidden');
-    // Initialize with 2 URL inputs for sheets
-    urlInputCount = 0;
-    document.getElementById('sheets-container').innerHTML = '';
-    addSheetURL();
-    addSheetURL();
-    // Update file list
-    updateFileList();
+// ═══════════════════════════════════════════════════════════════════════
+// SECTION 1: IMPORT LOCAL PL DATA
+// ═══════════════════════════════════════════════════════════════════════
+
+function openPLImportModal() {
+    document.getElementById('pl-import-modal').classList.remove('hidden');
+    plUrlInputCount = 0;
+    document.getElementById('pl-sheets-container').innerHTML = '';
+    addPLSheetURL();
+    addPLSheetURL();
+    updatePLFileList();
 }
 
-function closeImportModal() {
-    document.getElementById('import-modal').classList.add('hidden');
-    document.getElementById('file-list').innerHTML = '';
-    document.getElementById('import-progress').classList.add('hidden');
-    document.getElementById('import-results').classList.add('hidden');
-    document.getElementById('import-results').innerHTML = '';
+function closePLImportModal() {
+    document.getElementById('pl-import-modal').classList.add('hidden');
+    document.getElementById('pl-import-progress').classList.add('hidden');
+    document.getElementById('pl-import-results').classList.add('hidden');
+    document.getElementById('pl-import-results').innerHTML = '';
 }
 
-function switchImportTab(tab) {
-    // Update buttons
-    document.getElementById('tab-files').classList.toggle('bg-emerald-600', tab === 'files');
-    document.getElementById('tab-files').classList.toggle('text-white', tab === 'files');
-    document.getElementById('tab-files').classList.toggle('text-gray-700', tab === 'sheets');
-
-    document.getElementById('tab-sheets').classList.toggle('bg-emerald-600', tab === 'sheets');
-    document.getElementById('tab-sheets').classList.toggle('text-white', tab === 'sheets');
-    document.getElementById('tab-sheets').classList.toggle('text-gray-700', tab === 'files');
-
-    // Update content
-    document.getElementById('tab-content-files').classList.toggle('hidden', tab !== 'files');
-    document.getElementById('tab-content-sheets').classList.toggle('hidden', tab !== 'sheets');
+function switchPLTab(tab) {
+    document.getElementById('pl-tab-files').classList.toggle('bg-emerald-600', tab === 'files');
+    document.getElementById('pl-tab-files').classList.toggle('text-white', tab === 'files');
+    document.getElementById('pl-tab-sheets').classList.toggle('bg-emerald-600', tab === 'sheets');
+    document.getElementById('pl-tab-sheets').classList.toggle('text-white', tab === 'sheets');
+    document.getElementById('pl-tab-content-files').classList.toggle('hidden', tab !== 'files');
+    document.getElementById('pl-tab-content-sheets').classList.toggle('hidden', tab !== 'sheets');
 }
 
-// ─── Files Tab ──────────────────────────────────────────────────────
-function updateFileList() {
-    const fileInput = document.getElementById('file-input-multi');
-    const fileList = document.getElementById('file-list');
+function updatePLFileList() {
+    const fileInput = document.getElementById('pl-file-input');
+    const fileList = document.getElementById('pl-file-list');
     const files = fileInput.files;
-
     if (files.length === 0) {
         fileList.innerHTML = '<p class="text-sm text-gray-500">No files selected</p>';
         return;
     }
-
     fileList.innerHTML = `
         <div class="bg-gray-50 rounded-lg p-3">
             <p class="text-sm font-medium text-gray-700 mb-2">Selected Files (${files.length}):</p>
-            <ul class="space-y-1">
-                ${Array.from(files).map((f, i) => `<li class="text-sm text-gray-600">• ${f.name}</li>`).join('')}
-            </ul>
+            <ul class="space-y-1">${Array.from(files).map(f => `<li class="text-sm text-gray-600">• ${f.name}</li>`).join('')}</ul>
         </div>
     `;
 }
 
-document.getElementById('file-input-multi')?.addEventListener('change', updateFileList);
+document.getElementById('pl-file-input')?.addEventListener('change', updatePLFileList);
 
-async function importSelectedFiles() {
-    const fileInput = document.getElementById('file-input-multi');
-    const files = fileInput.files;
-
-    if (files.length === 0) {
-        alert('Please select at least one file');
-        return;
-    }
-
-    showImportProgress(true);
-    const resultsDiv = document.getElementById('import-results');
-    resultsDiv.innerHTML = '';
-    resultsDiv.classList.remove('hidden');
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const file of files) {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        try {
-            const resp = await fetch('/pl/api/upload/pl-file', { method: 'POST', body: formData });
-            const data = await resp.json();
-
-            if (resp.ok) {
-                successCount++;
-                resultsDiv.innerHTML += `
-                    <div class="p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm">
-                        <strong>✓ ${file.name}:</strong> ${data.message}
-                    </div>
-                `;
-            } else {
-                failCount++;
-                resultsDiv.innerHTML += `
-                    <div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
-                        <strong>✗ ${file.name}:</strong> ${data.error}
-                    </div>
-                `;
-            }
-        } catch (err) {
-            failCount++;
-            resultsDiv.innerHTML += `
-                <div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
-                    <strong>✗ ${file.name}:</strong> ${err.message}
-                </div>
-            `;
-        }
-    }
-
-    // Summary
-    resultsDiv.innerHTML += `
-        <div class="p-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-sm mt-3">
-            <strong>Summary:</strong> ${successCount} succeeded, ${failCount} failed
-        </div>
-    `;
-
-    showImportProgress(false);
-}
-
-// ─── Google Sheets Tab ──────────────────────────────────────────────
-function addSheetURL() {
-    urlInputCount++;
-    const container = document.getElementById('sheets-container');
-    const urlId = `sheet-url-${urlInputCount}`;
-    const monthId = `sheet-month-${urlInputCount}`;
-    const yearId = `sheet-year-${urlInputCount}`;
-
+function addPLSheetURL() {
+    plUrlInputCount++;
+    const container = document.getElementById('pl-sheets-container');
+    const id = plUrlInputCount;
     const div = document.createElement('div');
-    div.id = `sheet-row-${urlInputCount}`;
+    div.id = `pl-sheet-row-${id}`;
     div.className = 'border border-gray-200 rounded-lg p-4 space-y-3';
     div.innerHTML = `
         <div>
-            <label for="${urlId}" class="block text-sm font-medium text-gray-700 mb-1">Google Sheets URL</label>
-            <input type="url" id="${urlId}" placeholder="https://docs.google.com/spreadsheets/d/..."
+            <label class="block text-sm font-medium text-gray-700 mb-1">Google Sheets URL</label>
+            <input type="url" id="pl-sheet-url-${id}" placeholder="https://docs.google.com/spreadsheets/d/..."
                 class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 outline-none">
         </div>
-        <div class="grid grid-cols-3 gap-3">
-            <div>
-                <label for="${monthId}" class="block text-sm font-medium text-gray-700 mb-1">Month (optional)</label>
-                <select id="${monthId}" class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 outline-none">
-                    <option value="">Auto-detect</option>
-                    ${Array.from({length: 12}, (_, i) => `<option value="${i+1}">${i+1}</option>`).join('')}
-                </select>
-            </div>
-            <div>
-                <label for="${yearId}" class="block text-sm font-medium text-gray-700 mb-1">Year (optional)</label>
-                <input type="number" id="${yearId}" placeholder="2026" min="2020" max="2050"
-                    class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 outline-none">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">&nbsp;</label>
-                <button type="button" onclick="removeSheetURL(${urlInputCount})" class="w-full border border-red-300 text-red-600 hover:bg-red-50 font-medium py-2 px-3 rounded-lg transition text-sm">
-                    <i class="bi bi-trash"></i>
-                </button>
-            </div>
+        <div class="flex gap-3">
+            <button type="button" onclick="removePLSheetURL(${id})" class="flex-1 inline-flex items-center justify-center gap-2 border border-red-300 text-red-600 hover:bg-red-50 font-medium py-2 px-3 rounded-lg transition text-sm">
+                <i class="bi bi-trash"></i> Remove
+            </button>
         </div>
     `;
     container.appendChild(div);
 }
 
-function removeSheetURL(id) {
-    const row = document.getElementById(`sheet-row-${id}`);
-    if (row) row.remove();
+function removePLSheetURL(id) {
+    document.getElementById(`pl-sheet-row-${id}`)?.remove();
 }
 
-async function importSelectedSheets() {
-    const container = document.getElementById('sheets-container');
-    const rows = container.querySelectorAll('[id^="sheet-row-"]');
+async function importPLFiles() {
+    const fileInput = document.getElementById('pl-file-input');
+    const files = fileInput.files;
+    if (files.length === 0) {
+        alert('Please select at least one file');
+        return;
+    }
+    document.getElementById('pl-import-progress').classList.remove('hidden');
+    const resultsDiv = document.getElementById('pl-import-results');
+    resultsDiv.innerHTML = '';
+    resultsDiv.classList.remove('hidden');
 
+    let successCount = 0, failCount = 0;
+    for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const resp = await fetch('/pl/api/upload/pl-file', { method: 'POST', body: formData });
+            const data = await resp.json();
+            if (resp.ok) {
+                successCount++;
+                resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm"><strong>✓ ${file.name}:</strong> ${data.message}</div>`;
+            } else {
+                failCount++;
+                resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm"><strong>✗ ${file.name}:</strong> ${data.error}</div>`;
+            }
+        } catch (err) {
+            failCount++;
+            resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm"><strong>✗ ${file.name}:</strong> ${err.message}</div>`;
+        }
+    }
+    resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-sm mt-3"><strong>Summary:</strong> ${successCount} succeeded, ${failCount} failed</div>`;
+    document.getElementById('pl-import-progress').classList.add('hidden');
+}
+
+async function importPLSheets() {
+    const container = document.getElementById('pl-sheets-container');
+    const rows = container.querySelectorAll('[id^="pl-sheet-row-"]');
     if (rows.length === 0) {
         alert('Please add at least one Google Sheets URL');
         return;
     }
-
-    showImportProgress(true);
-    const resultsDiv = document.getElementById('import-results');
+    document.getElementById('pl-import-progress').classList.remove('hidden');
+    const resultsDiv = document.getElementById('pl-import-results');
     resultsDiv.innerHTML = '';
     resultsDiv.classList.remove('hidden');
 
-    let successCount = 0;
-    let failCount = 0;
-
+    let successCount = 0, failCount = 0;
     for (const row of rows) {
-        const id = row.id.replace('sheet-row-', '');
-        const url = document.getElementById(`sheet-url-${id}`).value.trim();
-        const month = document.getElementById(`sheet-month-${id}`).value || null;
-        const year = document.getElementById(`sheet-year-${id}`).value || null;
-
+        const id = row.id.replace('pl-sheet-row-', '');
+        const url = document.getElementById(`pl-sheet-url-${id}`).value.trim();
         if (!url) continue;
-
         try {
-            const body = { url };
-            if (month) body.month = parseInt(month);
-            if (year) body.year = parseInt(year);
-
             const resp = await fetch('/pl/api/upload/pl-google', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
+                body: JSON.stringify({ url }),
             });
             const data = await resp.json();
-
             if (resp.ok) {
                 successCount++;
-                resultsDiv.innerHTML += `
-                    <div class="p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm">
-                        <strong>✓ Sheet ${id}:</strong> ${data.message}
-                    </div>
-                `;
+                resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm"><strong>✓ Sheet ${id}:</strong> ${data.message}</div>`;
             } else {
                 failCount++;
-                resultsDiv.innerHTML += `
-                    <div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
-                        <strong>✗ Sheet ${id}:</strong> ${data.error}
-                    </div>
-                `;
+                resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm"><strong>✗ Sheet ${id}:</strong> ${data.error}</div>`;
             }
         } catch (err) {
             failCount++;
-            resultsDiv.innerHTML += `
-                <div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
-                    <strong>✗ Sheet ${id}:</strong> ${err.message}
-                </div>
-            `;
+            resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm"><strong>✗ Sheet ${id}:</strong> ${err.message}</div>`;
         }
     }
-
-    // Summary
-    resultsDiv.innerHTML += `
-        <div class="p-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-sm mt-3">
-            <strong>Summary:</strong> ${successCount} succeeded, ${failCount} failed
-        </div>
-    `;
-
-    showImportProgress(false);
+    resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-sm mt-3"><strong>Summary:</strong> ${successCount} succeeded, ${failCount} failed</div>`;
+    document.getElementById('pl-import-progress').classList.add('hidden');
 }
 
-function showImportProgress(show) {
-    document.getElementById('import-progress').classList.toggle('hidden', !show);
-}
-
-// ─── Account Mapping ────────────────────────────────────────────────
-const mappings = {};
-
-function addAccountMapping() {
-    const localCode = document.getElementById('local-code').value.trim();
-    const hqCode = document.getElementById('hq-code').value.trim();
-
-    if (!localCode || !hqCode) {
-        alert('Please enter both local and HQ account codes');
-        return;
-    }
-
-    mappings[localCode] = hqCode;
-    updateMappingsTable();
-
-    document.getElementById('local-code').value = '';
-    document.getElementById('hq-code').value = '';
-}
-
-function removeAccountMapping(localCode) {
-    delete mappings[localCode];
-    updateMappingsTable();
-}
-
-function updateMappingsTable() {
-    const tbody = document.getElementById('mappings-tbody');
-
-    if (Object.keys(mappings).length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-gray-500">No mappings yet. Add one to get started.</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = Object.entries(mappings).map(([local, hq]) => `
-        <tr class="border-t border-gray-200 hover:bg-gray-50">
-            <td class="px-4 py-3 text-gray-900 font-mono">${local}</td>
-            <td class="px-4 py-3 text-gray-900 font-mono">${hq}</td>
-            <td class="px-4 py-3 text-center">
-                <button onclick="removeAccountMapping('${local}')" class="text-red-600 hover:text-red-700 text-sm">
-                    <i class="bi bi-trash"></i> Remove
-                </button>
-            </td>
-        </tr>
-    `).join('');
-}
-
-// ─── Delete All ─────────────────────────────────────────────────────
-async function deleteAllData() {
+async function clearPLData() {
     if (!confirm('Are you sure you want to delete ALL P&L data? This cannot be undone.')) return;
-
-    const result = document.getElementById('delete-result');
+    const result = document.getElementById('pl-result');
     result.classList.remove('hidden');
-
     try {
         const resp = await fetch('/pl/api/delete-all', { method: 'DELETE' });
         const data = await resp.json();
-
         if (resp.ok) {
             result.innerHTML = `<div class="p-4 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm"><strong>✓</strong> ${data.message}</div>`;
         } else {
@@ -463,6 +468,183 @@ async function deleteAllData() {
     } catch (err) {
         result.innerHTML = `<div class="p-4 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm"><strong>✗</strong> Error: ${err.message}</div>`;
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SECTION 2: IMPORT & MAP ACCOUNT CODES
+// ═══════════════════════════════════════════════════════════════════════
+
+function openMappingImportModal() {
+    document.getElementById('mapping-import-modal').classList.remove('hidden');
+    mappingUrlInputCount = 0;
+    document.getElementById('mapping-sheets-container').innerHTML = '';
+    addMappingSheetURL();
+    addMappingSheetURL();
+    updateMappingFileList();
+}
+
+function closeMappingImportModal() {
+    document.getElementById('mapping-import-modal').classList.add('hidden');
+    document.getElementById('mapping-import-progress').classList.add('hidden');
+    document.getElementById('mapping-import-results').classList.add('hidden');
+    document.getElementById('mapping-import-results').innerHTML = '';
+}
+
+function switchMappingTab(tab) {
+    document.getElementById('mapping-tab-files').classList.toggle('bg-emerald-600', tab === 'files');
+    document.getElementById('mapping-tab-files').classList.toggle('text-white', tab === 'files');
+    document.getElementById('mapping-tab-sheets').classList.toggle('bg-emerald-600', tab === 'sheets');
+    document.getElementById('mapping-tab-sheets').classList.toggle('text-white', tab === 'sheets');
+    document.getElementById('mapping-tab-content-files').classList.toggle('hidden', tab !== 'files');
+    document.getElementById('mapping-tab-content-sheets').classList.toggle('hidden', tab !== 'sheets');
+}
+
+function updateMappingFileList() {
+    const fileInput = document.getElementById('mapping-file-input');
+    const fileList = document.getElementById('mapping-file-list');
+    const files = fileInput.files;
+    if (files.length === 0) {
+        fileList.innerHTML = '<p class="text-sm text-gray-500">No files selected</p>';
+        return;
+    }
+    fileList.innerHTML = `
+        <div class="bg-gray-50 rounded-lg p-3">
+            <p class="text-sm font-medium text-gray-700 mb-2">Selected Files (${files.length}):</p>
+            <ul class="space-y-1">${Array.from(files).map(f => `<li class="text-sm text-gray-600">• ${f.name}</li>`).join('')}</ul>
+        </div>
+    `;
+}
+
+document.getElementById('mapping-file-input')?.addEventListener('change', updateMappingFileList);
+
+function addMappingSheetURL() {
+    mappingUrlInputCount++;
+    const container = document.getElementById('mapping-sheets-container');
+    const id = mappingUrlInputCount;
+    const div = document.createElement('div');
+    div.id = `mapping-sheet-row-${id}`;
+    div.className = 'border border-gray-200 rounded-lg p-4 space-y-3';
+    div.innerHTML = `
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Google Sheets URL</label>
+            <input type="url" id="mapping-sheet-url-${id}" placeholder="https://docs.google.com/spreadsheets/d/..."
+                class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 outline-none">
+        </div>
+        <div class="flex gap-3">
+            <button type="button" onclick="removeMappingSheetURL(${id})" class="flex-1 inline-flex items-center justify-center gap-2 border border-red-300 text-red-600 hover:bg-red-50 font-medium py-2 px-3 rounded-lg transition text-sm">
+                <i class="bi bi-trash"></i> Remove
+            </button>
+        </div>
+    `;
+    container.appendChild(div);
+}
+
+function removeMappingSheetURL(id) {
+    document.getElementById(`mapping-sheet-row-${id}`)?.remove();
+}
+
+async function importMappingFiles() {
+    const fileInput = document.getElementById('mapping-file-input');
+    const files = fileInput.files;
+    if (files.length === 0) {
+        alert('Please select at least one file');
+        return;
+    }
+    // TODO: Implement backend API for importing mapping files
+    alert('Mapping import from files - backend API coming soon');
+}
+
+async function importMappingSheets() {
+    const container = document.getElementById('mapping-sheets-container');
+    const rows = container.querySelectorAll('[id^="mapping-sheet-row-"]');
+    if (rows.length === 0) {
+        alert('Please add at least one Google Sheets URL');
+        return;
+    }
+    // TODO: Implement backend API for importing mapping sheets
+    alert('Mapping import from sheets - backend API coming soon');
+}
+
+function openMappingEditModal() {
+    document.getElementById('mapping-edit-modal').classList.remove('hidden');
+    updateEditMappingsTable();
+}
+
+function closeMappingEditModal() {
+    document.getElementById('mapping-edit-modal').classList.add('hidden');
+}
+
+function addMapping() {
+    const localCode = document.getElementById('edit-local-code').value.trim();
+    const hqCode = document.getElementById('edit-hq-code').value.trim();
+    if (!localCode || !hqCode) {
+        alert('Please enter both codes');
+        return;
+    }
+    mappingsData[localCode] = hqCode;
+    updateEditMappingsTable();
+    updateMappingsMainTable();
+    document.getElementById('edit-local-code').value = '';
+    document.getElementById('edit-hq-code').value = '';
+}
+
+function removeMapping(localCode) {
+    delete mappingsData[localCode];
+    updateEditMappingsTable();
+    updateMappingsMainTable();
+}
+
+function updateEditMappingsTable() {
+    const tbody = document.getElementById('edit-mappings-tbody');
+    if (Object.keys(mappingsData).length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-gray-500">No mappings yet.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = Object.entries(mappingsData).map(([local, hq]) => `
+        <tr class="border-t border-gray-200 hover:bg-gray-50">
+            <td class="px-4 py-3 text-gray-900 font-mono">${local}</td>
+            <td class="px-4 py-3 text-gray-900 font-mono">${hq}</td>
+            <td class="px-4 py-3 text-center">
+                <button onclick="removeMapping('${local}')" class="inline-flex items-center gap-1 text-red-600 hover:text-red-700 text-sm">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function updateMappingsMainTable() {
+    const tbody = document.getElementById('mappings-tbody');
+    if (Object.keys(mappingsData).length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-gray-500">No mappings yet. Import or add mappings to get started.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = Object.entries(mappingsData).map(([local, hq]) => `
+        <tr class="border-t border-gray-200 hover:bg-gray-50">
+            <td class="px-4 py-3 text-gray-900 font-mono">${local}</td>
+            <td class="px-4 py-3 text-gray-900 font-mono">${hq}</td>
+            <td class="px-4 py-3 text-center text-gray-500">-</td>
+        </tr>
+    `).join('');
+}
+
+async function exportMappingData() {
+    if (Object.keys(mappingsData).length === 0) {
+        alert('No mappings to export');
+        return;
+    }
+    // TODO: Implement export to Excel
+    alert('Export functionality - coming soon');
+}
+
+async function clearMappingData() {
+    if (!confirm('Are you sure you want to delete ALL account mappings?')) return;
+    mappingsData = {};
+    updateMappingsMainTable();
+    updateEditMappingsTable();
+    const result = document.getElementById('mapping-result');
+    result.innerHTML = '<div class="p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm"><strong>✓</strong> All mappings cleared</div>';
+    result.classList.remove('hidden');
 }
 </script>
 {% endblock %}
