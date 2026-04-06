@@ -37,7 +37,8 @@
         <table class="w-full text-sm">
             <thead class="bg-gray-800 text-white sticky top-0 z-20">
                 <tr>
-                    <th class="px-4 py-3 text-left font-semibold sticky left-0 z-30" style="min-width: 250px; width: 250px;">Chỉ Tiêu</th>
+                    <th class="px-4 py-3 text-left font-semibold sticky left-0 z-30" style="min-width: 200px; width: 200px;">Chỉ Tiêu</th>
+                    <th class="px-4 py-3 text-left font-semibold sticky" style="min-width: 100px; width: 100px; left: 200px; z-index: 25;">Tk</th>
                     <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 1</th>
                     <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 2</th>
                     <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 3</th>
@@ -173,8 +174,8 @@ function renderTable(monthlyData, annualData, subAccountsData) {
         // Line item name + formula
         const nameCell = document.createElement('td');
         nameCell.className = 'px-4 py-3 sticky left-0';
-        nameCell.style.minWidth = '250px';
-        nameCell.style.width = '250px';
+        nameCell.style.minWidth = '200px';
+        nameCell.style.width = '200px';
         nameCell.style.position = 'sticky';
         nameCell.style.left = '0';
         nameCell.style.zIndex = '10';
@@ -192,6 +193,15 @@ function renderTable(monthlyData, annualData, subAccountsData) {
         nameCell.appendChild(nameDiv);
         nameCell.appendChild(formulaDiv);
         row.appendChild(nameCell);
+
+        // Account code column (empty for main line items)
+        const codeCell = document.createElement('td');
+        codeCell.className = 'px-4 py-3 sticky';
+        codeCell.style.left = '200px';
+        codeCell.style.zIndex = '9';
+        codeCell.style.backgroundColor = SUBTOTAL_ITEMS.has(lineItem) ? '#f0fdf4' : '#ffffff';
+        codeCell.textContent = '';
+        row.appendChild(codeCell);
 
         // Monthly values
         for (let month = 1; month <= 12; month++) {
@@ -220,18 +230,29 @@ function renderTable(monthlyData, annualData, subAccountsData) {
             const subRow = document.createElement('tr');
             subRow.className = 'text-xs text-gray-500 bg-gray-50/50 hover:bg-gray-100/50';
 
+            // Sub-account name (indented)
             const subNameCell = document.createElement('td');
             subNameCell.className = 'px-4 py-2 sticky left-0';
-            subNameCell.style.minWidth = '250px';
-            subNameCell.style.width = '250px';
+            subNameCell.style.minWidth = '200px';
+            subNameCell.style.width = '200px';
             subNameCell.style.position = 'sticky';
             subNameCell.style.left = '0';
             subNameCell.style.zIndex = '5';
             subNameCell.style.backgroundColor = '#f9fafb';
             subNameCell.style.paddingLeft = '2rem';
-            subNameCell.innerHTML = `<span class="font-mono">${code}</span> ${sub.name}`;
+            subNameCell.textContent = sub.name;
 
             subRow.appendChild(subNameCell);
+
+            // Sub-account code (separate column)
+            const subCodeCell = document.createElement('td');
+            subCodeCell.className = 'px-4 py-2 sticky font-mono';
+            subCodeCell.style.left = '200px';
+            subCodeCell.style.zIndex = '4';
+            subCodeCell.style.backgroundColor = '#f9fafb';
+            subCodeCell.textContent = code;
+
+            subRow.appendChild(subCodeCell);
 
             // Sub-account monthly values
             for (let month = 1; month <= 12; month++) {
