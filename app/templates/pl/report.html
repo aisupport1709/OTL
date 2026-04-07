@@ -64,7 +64,7 @@
 <script>
 const LINE_ITEMS = [
     { name: 'Doanh thu thuần', formula: 'TK 511x (Ps Có)' },
-    { name: 'Giá vốn hàng bán', formula: 'TK 154 t - TK 6xx (Ps Nợ) + SDCK 1541 (Ps Nợ as negative)' },
+    { name: 'Giá vốn hàng bán', formula: 'Đầu kỳ + Phát sinh trong kỳ - Số dư cuối kỳ (SDCK 1541)' },
     { name: 'Lợi nhuận gộp', formula: 'Doanh thu thuần - Giá vốn hàng bán' },
     { name: 'Chi phí QLDN', formula: 'TK 642x (Ps Nợ)' },
     { name: 'Lợi nhuận thuần từ HĐKD', formula: 'Lợi nhuận gộp - Chi phí QLDN' },
@@ -73,6 +73,7 @@ const LINE_ITEMS = [
     { name: 'Thu nhập khác', formula: 'TK 711x (Ps Có)' },
     { name: 'Chi phí khác', formula: 'TK 811x (Ps Nợ)' },
     { name: 'Lợi nhuận trước thuế', formula: 'Lợi nhuận HĐKD + (DTTC - CPTC) + (TN khác - CP khác)' },
+    { name: 'Thuế TNDN', formula: 'TK 8211 (Ps Nợ)' },
 ];
 
 const SUBTOTAL_ITEMS = new Set(['Lợi nhuận gộp', 'Lợi nhuận thuần từ HĐKD', 'Lợi nhuận trước thuế']);
@@ -223,53 +224,145 @@ function renderTable(monthlyData, annualData, subAccountsData) {
 
         // Render sub-account rows
         const subs = subAccountsData[lineItem] || {};
-        const sortedCodes = Object.keys(subs).sort();
-        sortedCodes.forEach(code => {
-            const sub = subs[code];
-            const subRow = document.createElement('tr');
-            subRow.className = 'text-xs text-gray-500 bg-gray-50/50 hover:bg-gray-100/50';
 
-            // Sub-account name (indented)
-            const subNameCell = document.createElement('td');
-            subNameCell.className = 'px-4 py-2 sticky left-0';
-            subNameCell.style.minWidth = '200px';
-            subNameCell.style.width = '200px';
-            subNameCell.style.position = 'sticky';
-            subNameCell.style.left = '0';
-            subNameCell.style.zIndex = '5';
-            subNameCell.style.backgroundColor = '#f9fafb';
-            subNameCell.style.paddingLeft = '2rem';
-            subNameCell.textContent = sub.name;
+        if (lineItem === 'Giá vốn hàng bán') {
+            // 3-level COGS: sub-header rows + leaf sub-accounts under each
+            const COGS_GROUPS = {
+                '__opening__':    'Giá vốn hàng bán đầu kỳ',
+                '__production__': 'Giá vốn hàng bán phát sinh trong kỳ',
+                '__ending__':     'Giá vốn hàng bán số dư cuối kỳ',
+            };
+            const COGS_ORDER = ['__opening__', '__production__', '__ending__'];
 
-            subRow.appendChild(subNameCell);
+            COGS_ORDER.forEach(sentinel => {
+                const group = subs[sentinel];
+                if (!group) return;
 
-            // Sub-account code (separate column)
-            const subCodeCell = document.createElement('td');
-            subCodeCell.className = 'px-4 py-2 sticky font-mono';
-            subCodeCell.style.left = '200px';
-            subCodeCell.style.zIndex = '4';
-            subCodeCell.style.backgroundColor = '#f9fafb';
-            subCodeCell.textContent = code;
+                // Sub-header row
+                const headerRow = document.createElement('tr');
+                headerRow.className = 'text-xs bg-blue-50/40 hover:bg-blue-50/70';
 
-            subRow.appendChild(subCodeCell);
+                const headerNameCell = document.createElement('td');
+                headerNameCell.className = 'px-4 py-2 sticky left-0 font-semibold text-gray-600';
+                headerNameCell.style.minWidth = '200px';
+                headerNameCell.style.width = '200px';
+                headerNameCell.style.position = 'sticky';
+                headerNameCell.style.left = '0';
+                headerNameCell.style.zIndex = '5';
+                headerNameCell.style.backgroundColor = '#eff6ff';
+                headerNameCell.style.paddingLeft = '1.5rem';
+                headerNameCell.textContent = group.name;
+                headerRow.appendChild(headerNameCell);
 
-            // Sub-account monthly values
-            for (let month = 1; month <= 12; month++) {
-                const cell = document.createElement('td');
-                cell.className = 'px-4 py-2 text-right tabular-nums';
-                const val = (sub.monthly || {})[month] || 0;
-                cell.textContent = val === 0 ? '-' : formatCurrency(val);
-                subRow.appendChild(cell);
-            }
+                const headerCodeCell = document.createElement('td');
+                headerCodeCell.className = 'px-4 py-2 sticky';
+                headerCodeCell.style.left = '200px';
+                headerCodeCell.style.zIndex = '4';
+                headerCodeCell.style.backgroundColor = '#eff6ff';
+                headerCodeCell.textContent = '';
+                headerRow.appendChild(headerCodeCell);
 
-            // Sub-account annual value
-            const annualSubCell = document.createElement('td');
-            annualSubCell.className = 'px-4 py-2 text-right tabular-nums bg-gray-50/80';
-            annualSubCell.textContent = formatCurrency(sub.annual || 0);
-            subRow.appendChild(annualSubCell);
+                for (let month = 1; month <= 12; month++) {
+                    const cell = document.createElement('td');
+                    cell.className = 'px-4 py-2 text-right tabular-nums font-semibold text-gray-700';
+                    const val = (group.monthly || {})[month] || 0;
+                    cell.textContent = val === 0 ? '-' : formatCurrency(val);
+                    headerRow.appendChild(cell);
+                }
 
-            tbody.appendChild(subRow);
-        });
+                const headerAnnualCell = document.createElement('td');
+                headerAnnualCell.className = 'px-4 py-2 text-right tabular-nums font-semibold text-gray-700 bg-blue-50/60';
+                headerAnnualCell.textContent = formatCurrency(group.annual || 0);
+                headerRow.appendChild(headerAnnualCell);
+
+                tbody.appendChild(headerRow);
+
+                // Leaf sub-account rows under this group
+                const groupSubs = group.sub || {};
+                Object.keys(groupSubs).sort().forEach(code => {
+                    const leaf = groupSubs[code];
+                    const leafRow = document.createElement('tr');
+                    leafRow.className = 'text-xs text-gray-500 bg-gray-50/50 hover:bg-gray-100/50';
+
+                    const leafNameCell = document.createElement('td');
+                    leafNameCell.className = 'px-4 py-2 sticky left-0';
+                    leafNameCell.style.minWidth = '200px';
+                    leafNameCell.style.width = '200px';
+                    leafNameCell.style.position = 'sticky';
+                    leafNameCell.style.left = '0';
+                    leafNameCell.style.zIndex = '5';
+                    leafNameCell.style.backgroundColor = '#f9fafb';
+                    leafNameCell.style.paddingLeft = '3rem';
+                    leafNameCell.textContent = leaf.name;
+                    leafRow.appendChild(leafNameCell);
+
+                    const leafCodeCell = document.createElement('td');
+                    leafCodeCell.className = 'px-4 py-2 sticky font-mono';
+                    leafCodeCell.style.left = '200px';
+                    leafCodeCell.style.zIndex = '4';
+                    leafCodeCell.style.backgroundColor = '#f9fafb';
+                    leafCodeCell.textContent = code;
+                    leafRow.appendChild(leafCodeCell);
+
+                    for (let month = 1; month <= 12; month++) {
+                        const cell = document.createElement('td');
+                        cell.className = 'px-4 py-2 text-right tabular-nums';
+                        const val = (leaf.monthly || {})[month] || 0;
+                        cell.textContent = val === 0 ? '-' : formatCurrency(val);
+                        leafRow.appendChild(cell);
+                    }
+
+                    const leafAnnualCell = document.createElement('td');
+                    leafAnnualCell.className = 'px-4 py-2 text-right tabular-nums bg-gray-50/80';
+                    leafAnnualCell.textContent = formatCurrency(leaf.annual || 0);
+                    leafRow.appendChild(leafAnnualCell);
+
+                    tbody.appendChild(leafRow);
+                });
+            });
+        } else {
+            const sortedCodes = Object.keys(subs).sort();
+            sortedCodes.forEach(code => {
+                const sub = subs[code];
+                const subRow = document.createElement('tr');
+                subRow.className = 'text-xs text-gray-500 bg-gray-50/50 hover:bg-gray-100/50';
+
+                const subNameCell = document.createElement('td');
+                subNameCell.className = 'px-4 py-2 sticky left-0';
+                subNameCell.style.minWidth = '200px';
+                subNameCell.style.width = '200px';
+                subNameCell.style.position = 'sticky';
+                subNameCell.style.left = '0';
+                subNameCell.style.zIndex = '5';
+                subNameCell.style.backgroundColor = '#f9fafb';
+                subNameCell.style.paddingLeft = '2rem';
+                subNameCell.textContent = sub.name;
+                subRow.appendChild(subNameCell);
+
+                const subCodeCell = document.createElement('td');
+                subCodeCell.className = 'px-4 py-2 sticky font-mono';
+                subCodeCell.style.left = '200px';
+                subCodeCell.style.zIndex = '4';
+                subCodeCell.style.backgroundColor = '#f9fafb';
+                subCodeCell.textContent = code;
+                subRow.appendChild(subCodeCell);
+
+                for (let month = 1; month <= 12; month++) {
+                    const cell = document.createElement('td');
+                    cell.className = 'px-4 py-2 text-right tabular-nums';
+                    const val = (sub.monthly || {})[month] || 0;
+                    cell.textContent = val === 0 ? '-' : formatCurrency(val);
+                    subRow.appendChild(cell);
+                }
+
+                const annualSubCell = document.createElement('td');
+                annualSubCell.className = 'px-4 py-2 text-right tabular-nums bg-gray-50/80';
+                annualSubCell.textContent = formatCurrency(sub.annual || 0);
+                subRow.appendChild(annualSubCell);
+
+                tbody.appendChild(subRow);
+            });
+        }
     });
 }
 

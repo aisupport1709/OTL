@@ -19,62 +19,117 @@
     </script>
     <style>
         .chart-container { position: relative; min-height: 300px; }
+
+        #sidebar { transition: width 0.2s ease; }
+        #sidebar.collapsed { width: 3.5rem; }
+        #sidebar .nav-label,
+        #sidebar .sidebar-title-text,
+        #sidebar .sidebar-bottom { transition: opacity 0.15s ease, width 0.2s ease; }
+        #sidebar.collapsed .nav-label,
+        #sidebar.collapsed .sidebar-title-text,
+        #sidebar.collapsed .sidebar-bottom { opacity: 0; pointer-events: none; width: 0; overflow: hidden; white-space: nowrap; }
+        #sidebar .nav-link { transition: padding 0.2s ease; }
+        #sidebar.collapsed .nav-link { justify-content: center; padding-left: 0; padding-right: 0; }
+
+        #main-content { transition: margin-left 0.2s ease; }
+        #main-content.expanded { margin-left: 3.5rem; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div class="flex min-h-screen">
         <!-- Sidebar -->
-        <nav class="w-60 bg-sidebar fixed top-0 left-0 h-full text-white flex flex-col z-50 shadow-xl">
-            <div class="px-5 py-4 border-b border-white/10">
-                <h1 class="text-lg font-bold tracking-wide flex items-center gap-2">
-                    <i class="bi bi-graph-up-arrow text-emerald-400"></i> OTL P&L
+        <nav id="sidebar" class="w-60 bg-sidebar fixed top-0 left-0 h-full text-white flex flex-col z-50 shadow-xl">
+            <div class="px-4 py-4 border-b border-white/10 flex items-center justify-between">
+                <h1 class="sidebar-title-text text-lg font-bold tracking-wide flex items-center gap-2 overflow-hidden">
+                    <i class="bi bi-graph-up-arrow text-emerald-400 flex-shrink-0"></i>
+                    <span class="nav-label">OTL P&L</span>
                 </h1>
+                <button id="toggle-sidebar" class="text-white/50 hover:text-white transition flex-shrink-0 ml-auto" title="Toggle sidebar">
+                    <i id="toggle-icon" class="bi bi-layout-sidebar text-base"></i>
+                </button>
             </div>
             <ul class="flex-1 mt-2">
                 <li>
-                    <a href="{{ url_for('pl.report_page') }}" class="flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
-                        {% if request.path == '/pl/' or request.path == '/pl' %}border-emerald-400 bg-emerald-400/10 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}">
-                        <i class="bi bi-bar-chart text-base"></i> P&L Report
+                    <a href="{{ url_for('pl.report_page') }}" class="nav-link flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
+                        {% if request.path == '/pl/' or request.path == '/pl' %}border-emerald-400 bg-emerald-400/10 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}"
+                        title="P&L Report">
+                        <i class="bi bi-bar-chart text-base flex-shrink-0"></i>
+                        <span class="nav-label">P&L Report</span>
                     </a>
                 </li>
                 <li>
-                    <a href="{{ url_for('pl.import_page') }}" class="flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
-                        {% if request.path == '/pl/import' %}border-emerald-400 bg-emerald-400/10 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}">
-                        <i class="bi bi-cloud-upload text-base"></i> Import Data
+                    <a href="{{ url_for('pl.import_page') }}" class="nav-link flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
+                        {% if request.path == '/pl/import' %}border-emerald-400 bg-emerald-400/10 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}"
+                        title="Import Data">
+                        <i class="bi bi-cloud-upload text-base flex-shrink-0"></i>
+                        <span class="nav-label">Import Data</span>
                     </a>
                 </li>
                 {% if session.get('role') == 'admin' %}
                 <li class="border-t border-white/10 mt-2">
-                    <a href="/admin" class="flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
-                        {% if request.path.startswith('/admin') %}border-indigo-400 bg-indigo-400/10 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}">
-                        <i class="bi bi-shield-lock text-base"></i> Admin
+                    <a href="/admin" class="nav-link flex items-center gap-3 px-5 py-3 text-sm transition-all border-l-[3px]
+                        {% if request.path.startswith('/admin') %}border-indigo-400 bg-indigo-400/10 text-white font-medium{% else %}border-transparent text-white/60 hover:text-white hover:bg-white/5{% endif %}"
+                        title="Admin">
+                        <i class="bi bi-shield-lock text-base flex-shrink-0"></i>
+                        <span class="nav-label">Admin</span>
                     </a>
                 </li>
                 {% endif %}
             </ul>
             <!-- Switch App Button -->
-            <div class="px-3 py-2 border-t border-white/10">
-                <a href="{{ url_for('apps.selector') }}" class="flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all text-center justify-center font-medium">
-                    <i class="bi bi-arrow-left-right"></i> Switch App
+            <div class="sidebar-bottom px-3 py-2 border-t border-white/10">
+                <a href="{{ url_for('apps.selector') }}" class="nav-link flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all justify-center font-medium" title="Switch App">
+                    <i class="bi bi-arrow-left-right flex-shrink-0"></i>
+                    <span class="nav-label">Switch App</span>
                 </a>
             </div>
             <!-- User Info & Logout -->
-            <div class="px-5 py-3 border-t border-white/10 text-xs text-white/40">
-                <div class="flex items-center justify-between">
-                    <span>{{ session.get('display_name', 'User') }}</span>
-                    <a href="{{ url_for('auth.logout') }}" class="text-white/50 hover:text-white transition" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
+            <div class="sidebar-bottom px-4 py-3 border-t border-white/10 text-xs text-white/40">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="nav-label truncate">{{ session.get('display_name', 'User') }}</span>
+                    <a href="{{ url_for('auth.logout') }}" class="text-white/50 hover:text-white transition flex-shrink-0" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
                 </div>
             </div>
         </nav>
 
         <!-- Main Content -->
-        <main class="ml-60 flex-1 p-6">
+        <main id="main-content" class="ml-60 flex-1 p-6">
             {% block content %}{% endblock %}
         </main>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        (function () {
+            const sidebar = document.getElementById('sidebar');
+            const main = document.getElementById('main-content');
+            const icon = document.getElementById('toggle-icon');
+            const STORAGE_KEY = 'pl_sidebar_collapsed';
+
+            function setCollapsed(collapsed) {
+                if (collapsed) {
+                    sidebar.classList.add('collapsed');
+                    main.classList.add('expanded');
+                    icon.className = 'bi bi-layout-sidebar-reverse text-base';
+                } else {
+                    sidebar.classList.remove('collapsed');
+                    main.classList.remove('expanded');
+                    icon.className = 'bi bi-layout-sidebar text-base';
+                }
+                localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0');
+            }
+
+            // Restore state
+            if (localStorage.getItem(STORAGE_KEY) === '1') {
+                setCollapsed(true);
+            }
+
+            document.getElementById('toggle-sidebar').addEventListener('click', function () {
+                setCollapsed(!sidebar.classList.contains('collapsed'));
+            });
+        })();
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

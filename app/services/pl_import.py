@@ -290,22 +290,22 @@ def import_sdck_file(file_path, filename, account_target):
     error_count = 0
     errors = []
 
-    # Find columns
+    # Find columns — exact name match only
     col_tk = None
     col_ten = None
     col_no = None
 
     for col in df.columns:
-        col_str = str(col).strip().lower()
-        if 'tk' in col_str and col_tk is None:
+        col_norm = str(col).strip().lower()
+        if col_norm == 'tk':
             col_tk = col
-        if 'tên' in col_str or 'ten' in col_str:
+        elif col_norm in ('tên tk', 'ten tk'):
             col_ten = col
-        if ('nợ' in col_str or 'no' in col_str) and col_no is None:
+        elif col_norm in ('ps nợ', 'ps no'):
             col_no = col
 
     if not col_tk or not col_no:
-        errors.append(f"ERROR: Missing required columns. Expected: 'Tk', 'Tên tk', 'Ps nợ'")
+        errors.append(f"ERROR: Missing required columns. Expected exactly: 'Tk', 'Tên tk', 'Ps nợ'. Found: {list(df.columns)}")
         return 0, len(errors), errors
 
     for idx, row in df.iterrows():
@@ -372,22 +372,22 @@ def _import_sdck_dataframe(df, account_target, month, year, source_name):
     error_count = 0
     errors = []
 
-    # Find columns
+    # Find columns — exact name match only
     col_tk = None
     col_ten = None
     col_no = None
 
     for col in df.columns:
-        col_str = str(col).strip().lower()
-        if 'tk' in col_str and col_tk is None:
+        col_norm = str(col).strip().lower()
+        if col_norm == 'tk':
             col_tk = col
-        if 'tên' in col_str or 'ten' in col_str:
+        elif col_norm in ('tên tk', 'ten tk'):
             col_ten = col
-        if ('nợ' in col_str or 'no' in col_str) and col_no is None:
+        elif col_norm in ('ps nợ', 'ps no'):
             col_no = col
 
     if not col_tk or not col_no:
-        errors.append(f"ERROR: Missing required columns. Expected: 'Tk', 'Tên tk', 'Ps nợ'")
+        errors.append(f"ERROR: Missing required columns. Expected exactly: 'Tk', 'Tên tk', 'Ps nợ'. Found: {list(df.columns)}")
         return 0, len(errors), errors
 
     for idx, row in df.iterrows():
@@ -614,21 +614,16 @@ def extract_month_year_from_content(filepath):
 
 def calculate_pl(year):
     """
-    Calculate P&L report for a given year, including sub-account breakdown.
-    Returns dict: {month: {'totals': {...}, 'sub_accounts': {...}}, ...}
+    Calculate P&L report for a given year with 3-level COGS breakdown.
 
-    Aggregation rules:
-    - file_type='911': Revenue (511x credit, 515x credit, 711x credit) + Expenses (642x debit, 635x debit, 811x debit)
-    - file_type='154' (Cost of Production): Giá vốn hàng bán from accounts 6xx (debit side)
-    - Leaf-node filtering: only include codes that have no children within their (file, prefix) group
-    - SDCK 1541: Ending inventory adjustment (subtracted from COGS)
-
-    Account mapping:
-    - Giá vốn hàng bán (COGS): TK 154 t - TK 6xx (Ps Nợ / Debit) + SDCK 1541 Inventory
+    COGS Formula: Giá vốn hàng bán = Opening + Production - Ending
+    Where:
+    - Opening (đầu kỳ)      = SDCK of previous month (Dec prev year for January)
+    - Production (phát sinh) = TK 154t - TK 6xx leaf codes (Ps Nợ)
+    - Ending (cuối kỳ)       = SDCK of current month (stored as POSITIVE, subtracted here)
     """
     entries = PLEntry.query.filter_by(year=year).all()
 
-    # Map account prefix to P&L line item
     PREFIX_TO_LINE = {
         '511': 'Doanh thu thuần',
         '515': 'Doanh thu HĐTC',
@@ -638,164 +633,163 @@ def calculate_pl(year):
         '811': 'Chi phí khác',
     }
 
-    # Group by month
+    # Build SDCK lookup for ALL years (needed for January → Dec prev year)
+    all_sdck = PLSDCK.query.all()
+    sdck_by_month_year = {}
+    for e in all_sdck:
+        key = (e.month, e.year)
+        if key not in sdck_by_month_year:
+            sdck_by_month_year[key] = {}
+        code = str(e.account_code).strip()
+        if code not in sdck_by_month_year[key]:
+            sdck_by_month_year[key][code] = {'name': e.account_name or '', 'balance': 0}
+        sdck_by_month_year[key][code]['balance'] += e.balance
+
+    # Initialize monthly data with 3 COGS sub-items
     monthly_data = {}
     for month in range(1, 13):
         monthly_data[month] = {
             'totals': {
                 'Doanh thu thuần': 0,
-                'Giá vốn hàng bán': 0,
+                'cogs_opening': 0,      # đầu kỳ: prev month SDCK
+                'cogs_production': 0,   # phát sinh: 154t 6xx
+                'cogs_ending': 0,       # cuối kỳ: current month SDCK (positive)
                 'Doanh thu HĐTC': 0,
                 'Chi phí QLDN': 0,
                 'Chi phí tài chính': 0,
                 'Thu nhập khác': 0,
                 'Chi phí khác': 0,
+                'Thuế TNDN': 0,
             },
             'sub_accounts': {
                 'Doanh thu thuần': {},
-                'Giá vốn hàng bán': {},
+                'cogs_opening': {},
+                'cogs_production': {},
+                'cogs_ending': {},
                 'Doanh thu HĐTC': {},
                 'Chi phí QLDN': {},
                 'Chi phí tài chính': {},
                 'Thu nhập khác': {},
                 'Chi phí khác': {},
+                'Thuế TNDN': {},
             }
         }
+
+    # Populate opening and ending inventory for each month
+    for month in range(1, 13):
+        # Ending = current month SDCK (positive — subtracted in formula)
+        for code, info in sdck_by_month_year.get((month, year), {}).items():
+            if info['balance'] != 0:
+                monthly_data[month]['totals']['cogs_ending'] += info['balance']
+                monthly_data[month]['sub_accounts']['cogs_ending'][code] = {
+                    'name': info['name'], 'value': info['balance']
+                }
+
+        # Opening = previous month SDCK (Jan → Dec of previous year)
+        prev_key = (12, year - 1) if month == 1 else (month - 1, year)
+        for code, info in sdck_by_month_year.get(prev_key, {}).items():
+            if info['balance'] != 0:
+                monthly_data[month]['totals']['cogs_opening'] += info['balance']
+                monthly_data[month]['sub_accounts']['cogs_opening'][code] = {
+                    'name': info['name'], 'value': info['balance']
+                }
 
     # Pre-calculate leaf codes per (month, file_type, prefix group)
     leaf_cache = {}
 
     def get_leaf_set(month, file_type, prefix):
-        """Get leaf codes for a specific (month, file_type, prefix) group."""
         key = (month, file_type, prefix)
         if key not in leaf_cache:
-            # Query all codes for this group
             query = PLEntry.query.filter_by(year=year, month=month, file_type=file_type)
             codes_for_group = set()
-
-            for entry in query.all():
-                code = str(entry.account_code).strip()
-                # Check if code matches this prefix
+            for e in query.all():
+                c = str(e.account_code).strip()
                 if prefix == 'COGS_6':
-                    # File 154 t: Only 6xx accounts (not 8xx)
-                    if code[0] == '6':
-                        codes_for_group.add(code)
+                    if c[0] == '6':
+                        codes_for_group.add(c)
                 else:
-                    if code.startswith(prefix):
-                        codes_for_group.add(code)
-
+                    if c.startswith(prefix):
+                        codes_for_group.add(c)
             leaf_cache[key] = get_leaf_codes(codes_for_group)
-
         return leaf_cache[key]
 
-    # Aggregate by account code
+    # Aggregate 911t and 154t entries
     for entry in entries:
         if entry.month not in monthly_data:
             continue
 
         month_data = monthly_data[entry.month]
         code = str(entry.account_code).strip()
-
-        # Determine which line item and group this entry belongs to
         line_item = None
         is_leaf = False
         value = 0
 
         if entry.file_type == '911':
-            # File 911: revenues + expenses from main accounts
-            for prefix, item in PREFIX_TO_LINE.items():
-                if code.startswith(prefix):
-                    line_item = item
-                    leaf_set = get_leaf_set(entry.month, '911', prefix)
-                    is_leaf = code in leaf_set
-                    # Determine value: credit for revenue, debit for expense
-                    if prefix in ('511', '515', '711'):
-                        value = entry.credit
-                    else:
-                        value = entry.debit
-                    break
+            # Exact match for 8211 (Thuế TNDN) before prefix matching
+            if code == '8211':
+                line_item = 'Thuế TNDN'
+                is_leaf = True
+                value = entry.debit
+            else:
+                for prefix, item in PREFIX_TO_LINE.items():
+                    if code.startswith(prefix):
+                        line_item = item
+                        leaf_set = get_leaf_set(entry.month, '911', prefix)
+                        is_leaf = code in leaf_set
+                        value = entry.credit if prefix in ('511', '515', '711') else entry.debit
+                        break
 
         elif entry.file_type == '154':
-            # File "154 t" (Cost of Production): Giá vốn hàng bán from accounts 6xx (debit)
-            # Note: SDCK 1541 ending inventory adjustment is added separately below
+            # Production costs: 6xx accounts only
             if code[0] == '6':
-                line_item = 'Giá vốn hàng bán'
+                line_item = 'cogs_production'
                 leaf_set = get_leaf_set(entry.month, '154', 'COGS_6')
                 is_leaf = code in leaf_set
                 value = entry.debit
 
         if line_item and is_leaf and value != 0:
-            # Add to totals
             month_data['totals'][line_item] += value
-
-            # Add to sub_accounts
             if code not in month_data['sub_accounts'][line_item]:
                 month_data['sub_accounts'][line_item][code] = {
-                    'name': entry.account_name or '',
-                    'value': 0
+                    'name': entry.account_name or '', 'value': 0
                 }
             month_data['sub_accounts'][line_item][code]['value'] += value
-
-    # Process SDCK (Số dư cuối kỳ / Ending Balance) data - add to COGS
-    sdck_entries = PLSDCK.query.filter_by(year=year).all()
-    for entry in sdck_entries:
-        if entry.month in monthly_data:
-            month_data = monthly_data[entry.month]
-            # SDCK data represents ending balance of accounts, add to COGS
-            line_item = 'Giá vốn hàng bán'
-            code = str(entry.account_code).strip()
-            value = entry.balance  # Already negative if needed
-
-            if value != 0:
-                month_data['totals'][line_item] += value
-
-                if code not in month_data['sub_accounts'][line_item]:
-                    month_data['sub_accounts'][line_item][code] = {
-                        'name': entry.account_name or '',
-                        'value': 0
-                    }
-                month_data['sub_accounts'][line_item][code]['value'] += value
 
     # Calculate P&L metrics for each month
     result = {}
     for month, data in monthly_data.items():
-        result[month] = calculate_monthly_pl(
-            data['totals'],
-            data['sub_accounts']
-        )
+        result[month] = calculate_monthly_pl(data['totals'], data['sub_accounts'])
 
     return result
 
 
 def calculate_monthly_pl(totals, sub_accounts):
     """
-    Calculate P&L line items from aggregated monthly totals and sub-accounts.
-    Returns: {
-        'Doanh thu thuần': value,
-        'Giá vốn hàng bán': value,
-        ...
-        'Lợi nhuận trước thuế': value,
-        '__sub_accounts__': {
-            'Doanh thu thuần': {code: {name, value}, ...},
-            ...
-        }
-    }
+    Calculate P&L line items.
+    COGS = cogs_opening + cogs_production - cogs_ending  (explicit subtraction)
     """
     revenue = totals['Doanh thu thuần']
-    cogs = totals['Giá vốn hàng bán']
+    cogs_opening = totals['cogs_opening']
+    cogs_production = totals['cogs_production']
+    cogs_ending = totals['cogs_ending']
+    cogs = cogs_opening + cogs_production - cogs_ending  # formula
     sga = totals['Chi phí QLDN']
     fin_revenue = totals['Doanh thu HĐTC']
     fin_expense = totals['Chi phí tài chính']
     other_revenue = totals['Thu nhập khác']
     other_expense = totals['Chi phí khác']
+    tax = totals['Thuế TNDN']
 
     gross_profit = revenue - cogs
     operating_profit = gross_profit - sga
     pbt = operating_profit + (fin_revenue - fin_expense) + (other_revenue - other_expense)
 
-    result = {
+    return {
         'Doanh thu thuần': revenue,
         'Giá vốn hàng bán': cogs,
+        'cogs_opening': cogs_opening,
+        'cogs_production': cogs_production,
+        'cogs_ending': cogs_ending,
         'Lợi nhuận gộp': gross_profit,
         'Chi phí QLDN': sga,
         'Lợi nhuận thuần từ HĐKD': operating_profit,
@@ -804,9 +798,9 @@ def calculate_monthly_pl(totals, sub_accounts):
         'Thu nhập khác': other_revenue,
         'Chi phí khác': other_expense,
         'Lợi nhuận trước thuế': pbt,
+        'Thuế TNDN': tax,
         '__sub_accounts__': sub_accounts,
     }
-    return result
 
 
 def get_available_years():

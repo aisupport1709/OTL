@@ -36,7 +36,6 @@ Specialized Vietnamese accounting module for generating Profit & Loss statements
 - COGS calculation with inventory adjustment formula
 - 10-line P&L statement with subtotals
 - Sub-account breakdown in both web and Excel formats
-- Account mapping feature (Local → HQ codes)
 - Monthly and annual reporting
 
 **Key Features:**
@@ -67,8 +66,7 @@ Specialized Vietnamese accounting module for generating Profit & Loss statements
 │   ├── models/
 │   │   ├── invoice.py                 ← Invoice model (OTL)
 │   │   ├── pl_entry.py                ← P&L entry model
-│   │   ├── pl_sdck.py                 ← Inventory balance model
-│   │   └── account_mapping.py         ← Account mapping model
+│   │   └── pl_sdck.py                 ← Inventory balance model
 │   │
 │   └── templates/
 │       ├── otl/                       ← OTL Reports UI
