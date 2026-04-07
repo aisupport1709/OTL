@@ -365,7 +365,7 @@ def export_pl_report():
 
             # Main line row
             ws[f'A{row}'] = line_item
-            ws[f'B{row}'] = ''  # Empty code column for main items
+            ws[f'B{row}'] = '8211' if line_item == 'Thuế TNDN' else ''
             ws[f'A{row}'].font = (subtotal_font if is_subtotal else main_row_font)
             ws[f'B{row}'].font = (subtotal_font if is_subtotal else main_row_font)
             ws[f'A{row}'].fill = (subtotal_fill if is_subtotal else main_row_fill)

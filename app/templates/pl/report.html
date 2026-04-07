@@ -73,7 +73,7 @@ const LINE_ITEMS = [
     { name: 'Thu nhập khác', formula: 'TK 711x (Ps Có)' },
     { name: 'Chi phí khác', formula: 'TK 811x (Ps Nợ)' },
     { name: 'Lợi nhuận trước thuế', formula: 'Lợi nhuận HĐKD + (DTTC - CPTC) + (TN khác - CP khác)' },
-    { name: 'Thuế TNDN', formula: 'TK 8211 (Ps Nợ)' },
+    { name: 'Thuế TNDN', formula: 'TK 8211 (Ps Nợ)', account_code: '8211' },
 ];
 
 const SUBTOTAL_ITEMS = new Set(['Lợi nhuận gộp', 'Lợi nhuận thuần từ HĐKD', 'Lợi nhuận trước thuế']);
@@ -194,13 +194,13 @@ function renderTable(monthlyData, annualData, subAccountsData) {
         nameCell.appendChild(formulaDiv);
         row.appendChild(nameCell);
 
-        // Account code column (empty for main line items)
+        // Account code column (show fixed code if defined, empty otherwise)
         const codeCell = document.createElement('td');
-        codeCell.className = 'px-4 py-3 sticky';
+        codeCell.className = 'px-4 py-3 sticky font-mono text-gray-500';
         codeCell.style.left = '200px';
         codeCell.style.zIndex = '9';
         codeCell.style.backgroundColor = SUBTOTAL_ITEMS.has(lineItem) ? '#f0fdf4' : '#ffffff';
-        codeCell.textContent = '';
+        codeCell.textContent = item.account_code || '';
         row.appendChild(codeCell);
 
         // Monthly values

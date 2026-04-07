@@ -749,11 +749,13 @@ def calculate_pl(year):
 
         if line_item and is_leaf and value != 0:
             month_data['totals'][line_item] += value
-            if code not in month_data['sub_accounts'][line_item]:
-                month_data['sub_accounts'][line_item][code] = {
-                    'name': entry.account_name or '', 'value': 0
-                }
-            month_data['sub_accounts'][line_item][code]['value'] += value
+            # Thuế TNDN: no sub-account breakdown needed (single TK 8211)
+            if line_item != 'Thuế TNDN':
+                if code not in month_data['sub_accounts'][line_item]:
+                    month_data['sub_accounts'][line_item][code] = {
+                        'name': entry.account_name or '', 'value': 0
+                    }
+                month_data['sub_accounts'][line_item][code]['value'] += value
 
     # Calculate P&L metrics for each month
     result = {}
