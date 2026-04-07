@@ -324,9 +324,9 @@ def import_sdck_file(file_path, filename, account_target):
             account_name = str(row.get(col_ten, '')).strip() if col_ten else ''
             balance_raw = row.get(col_no, 0)
 
-            # Parse balance as float and convert to negative (for Ps Nợ)
+            # Parse balance as float (store as POSITIVE - will be subtracted in COGS formula)
             try:
-                balance = -float(balance_raw) if pd.notna(balance_raw) else 0
+                balance = float(balance_raw) if pd.notna(balance_raw) else 0
             except (ValueError, TypeError):
                 balance = 0
 
@@ -406,9 +406,9 @@ def _import_sdck_dataframe(df, account_target, month, year, source_name):
             account_name = str(row.get(col_ten, '')).strip() if col_ten else ''
             balance_raw = row.get(col_no, 0)
 
-            # Parse balance as float and convert to negative (for Ps Nợ)
+            # Parse balance as float (store as POSITIVE - will be subtracted in COGS formula)
             try:
-                balance = -float(balance_raw) if pd.notna(balance_raw) else 0
+                balance = float(balance_raw) if pd.notna(balance_raw) else 0
             except (ValueError, TypeError):
                 balance = 0
 
