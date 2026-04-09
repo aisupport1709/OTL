@@ -36,21 +36,22 @@
         <table class="w-full text-sm">
             <thead class="bg-gray-800 text-white sticky top-0 z-20">
                 <tr>
-                    <th class="px-4 py-3 text-left font-semibold sticky left-0 z-30" style="min-width: 200px; width: 200px;">Chỉ Tiêu</th>
-                    <th class="px-4 py-3 text-left font-semibold sticky" style="min-width: 100px; width: 100px; left: 200px; z-index: 25;">Tk</th>
-                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 1</th>
-                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 2</th>
-                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 3</th>
-                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 4</th>
-                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 5</th>
-                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 6</th>
-                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 7</th>
-                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 8</th>
-                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 9</th>
-                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 10</th>
-                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 11</th>
-                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Tháng 12</th>
-                    <th class="px-4 py-3 text-right font-semibold bg-gray-700 min-w-[140px]">Tổng Năm</th>
+                    <th class="px-4 py-3 text-left font-semibold sticky left-0 z-30" style="min-width: 200px; width: 200px;">Acc No</th>
+                    <th class="px-4 py-3 text-left font-semibold sticky" style="min-width: 160px; width: 160px; left: 200px; z-index: 25;">Description EN</th>
+                    <th class="px-4 py-3 text-left font-semibold sticky" style="min-width: 160px; width: 160px; left: 360px; z-index: 25;">Description VN</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Jan</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Feb</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Mar</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Apr</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">May</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Jun</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Jul</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Aug</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Sep</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Oct</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Nov</th>
+                    <th class="px-4 py-3 text-right font-semibold min-w-[140px]">Dec</th>
+                    <th class="px-4 py-3 text-right font-semibold bg-gray-700 min-w-[140px]">Annual FS</th>
                 </tr>
             </thead>
             <tbody id="table-body" class="divide-y divide-gray-100"></tbody>
@@ -63,20 +64,29 @@
 {% block scripts %}
 <script>
 const LINE_ITEMS = [
-    { name: 'Doanh thu thuần', formula: 'TK 511x (Ps Có)' },
-    { name: 'Giá vốn hàng bán', formula: 'Đầu kỳ + Phát sinh trong kỳ - Số dư cuối kỳ (SDCK 1541)' },
-    { name: 'Lợi nhuận gộp', formula: 'Doanh thu thuần - Giá vốn hàng bán' },
-    { name: 'Chi phí QLDN', formula: 'TK 642x (Ps Nợ)' },
-    { name: 'Lợi nhuận thuần từ HĐKD', formula: 'Lợi nhuận gộp - Chi phí QLDN' },
-    { name: 'Doanh thu HĐTC', formula: 'TK 515x (Ps Có)' },
-    { name: 'Chi phí tài chính', formula: 'TK 635x (Ps Nợ)' },
-    { name: 'Thu nhập khác', formula: 'TK 711x (Ps Có)' },
-    { name: 'Chi phí khác', formula: 'TK 811x (Ps Nợ)' },
-    { name: 'Lợi nhuận trước thuế', formula: 'Lợi nhuận HĐKD + (DTTC - CPTC) + (TN khác - CP khác)' },
-    { name: 'Thuế TNDN', formula: 'TK 8211 (Ps Nợ)', account_code: '8211' },
+    { name: 'Doanh thu thuần',          label: 'REVENUE',                                                                     formula: 'TK 511x (Ps Có)' },
+    { name: 'Giá vốn hàng bán',         label: 'COST OF GOODS SOLD',                                                          formula: 'Đầu kỳ + Phát sinh trong kỳ - Số dư cuối kỳ (SDCK 1541)' },
+    { name: 'Lợi nhuận gộp',            label: 'Gross profit',                                                                formula: 'Doanh thu thuần - Giá vốn hàng bán' },
+    { name: 'Chi phí QLDN',             label: 'ADMINISTRATION EXPENSES (WITH RED INVOICES)',                                  formula: 'TK 642x (Ps Nợ)' },
+    { name: 'Lợi nhuận thuần từ HĐKD', label: 'OPERATING PROFIT FROM BUSINESS ACTIVITIES (TAX PURPOSE)',                     formula: 'Lợi nhuận gộp - Chi phí QLDN' },
+    { name: 'Doanh thu HĐTC',           label: 'FINANCIAL INCOME',                                                            formula: 'TK 515x (Ps Có)' },
+    { name: 'Chi phí tài chính',        label: 'FINANCIAL EXPENSES',                                                          formula: 'TK 635x (Ps Nợ)' },
+    { name: 'Thu nhập khác',            label: 'OTHER INCOMES',                                                               formula: 'TK 711x (Ps Có)' },
+    { name: 'Chi phí khác',             label: 'OTHER EXPENSES (Without RED INVOICES)',                                       formula: 'TK 811x (Ps Nợ)' },
+    { name: 'Lợi nhuận trước thuế',     label: 'PROFIT/(LOSS) BEFORE TAXATION',                                               formula: 'Lợi nhuận HĐKD + (DTTC - CPTC) + (TN khác - CP khác)' },
+    { name: 'Thuế TNDN',                label: 'INCOME TAX',                                                                  formula: 'TK 8211 (Ps Nợ)', account_code: '8211' },
+    { name: '__profit_after_tax__',     label: 'PROFIT AFTER TAXATION',                                                       formula: 'PROFIT/(LOSS) BEFORE TAXATION - INCOME TAX', computed: true },
 ];
 
-const SUBTOTAL_ITEMS = new Set(['Lợi nhuận gộp', 'Lợi nhuận thuần từ HĐKD', 'Lợi nhuận trước thuế']);
+const COGS_GROUP_LABELS = {
+    '__opening__':    'Opening balance',
+    '__production__': 'Purchases',
+    '__ending__':     'Closing balance',
+};
+
+const SUBTOTAL_ITEMS = new Set(['Lợi nhuận gộp', 'Lợi nhuận thuần từ HĐKD', 'Lợi nhuận trước thuế', '__profit_after_tax__']);
+
+let accountMappings = {};
 
 function formatCurrency(value) {
     if (value === null || value === undefined || isNaN(value)) {
@@ -129,10 +139,19 @@ async function loadPLReport(year) {
     exportBtn.classList.add('hidden');
 
     try {
-        const resp = await fetch(`/pl/api/report?year=${year}`);
-        const data = await resp.json();
+        const [reportResp, mappingResp] = await Promise.all([
+            fetch(`/pl/api/report?year=${year}`),
+            fetch('/pl/api/mappings'),
+        ]);
 
-        if (resp.ok && data.monthly) {
+        const data = await reportResp.json();
+        if (mappingResp.ok) {
+            const mappingData = await mappingResp.json();
+            accountMappings = {};
+            (mappingData.mappings || []).forEach(m => { accountMappings[m.local_code] = m.hq_code; });
+        }
+
+        if (reportResp.ok && data.monthly) {
             renderTable(data.monthly, data.annual, data.sub_accounts || {});
             tableContainer.classList.remove('hidden');
             exportBtn.classList.remove('hidden');
@@ -153,214 +172,196 @@ function exportReport() {
     window.location.href = `/pl/api/export?year=${year}`;
 }
 
+// Sticky column offsets (px)
+// Group header rows: colspan=3 label | months...
+// Data rows:         Acc No (200@0) | Desc EN (160@200) | Desc VN (160@360) | months...
+const COL_DESC_WIDTH  = 200;
+const COL_EN_WIDTH    = 160;
+const COL_VN_WIDTH    = 160;
+const COL_DESC_LEFT   = 0;                                       // 0
+const COL_ACC_LEFT    = COL_DESC_WIDTH;                          // 200
+const COL_EN_LEFT     = COL_DESC_WIDTH + COL_EN_WIDTH;           // 360
+// total sticky = 520px
+
+function makeStickyBg(isSubtotal) { return isSubtotal ? '#f0fdf4' : '#ffffff'; }
+
+function addEnNameCell(row, enName, bgColor, zIndex, extraPaddingLeft) {
+    const cell = document.createElement('td');
+    cell.className = 'px-4 py-3 sticky text-xs text-gray-500';
+    cell.style.minWidth = COL_EN_WIDTH + 'px';
+    cell.style.width    = COL_EN_WIDTH + 'px';
+    cell.style.left     = COL_EN_LEFT + 'px';
+    cell.style.zIndex   = zIndex || '9';
+    cell.style.backgroundColor = bgColor;
+    if (extraPaddingLeft) cell.style.paddingLeft = extraPaddingLeft;
+    cell.textContent = enName || '';
+    row.appendChild(cell);
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+// Renders a full-width group header row (label spans all 3 sticky cols via colspan=3).
+// monthValues: { 1..12: value }, annualValue: number
+function appendGroupHeaderRow(tbody, label, monthValues, annualValue, {
+    bgColor = '#1f2937', textColor = '#ffffff', indent = '0', fontSize = 'text-sm', bold = true,
+    annualBg = ''
+} = {}) {
+    const row = document.createElement('tr');
+    row.className = 'hover:opacity-90';
+
+    const labelCell = document.createElement('td');
+    labelCell.setAttribute('colspan', '3');
+    labelCell.className = `px-4 py-2 sticky left-0 ${fontSize} ${bold ? 'font-semibold' : ''} z-10`;
+    labelCell.style.color = textColor;
+    labelCell.style.backgroundColor = bgColor;
+    labelCell.style.paddingLeft = indent || '1rem';
+    labelCell.style.minWidth = (COL_DESC_WIDTH + COL_EN_WIDTH + COL_VN_WIDTH) + 'px';
+    labelCell.textContent = label;
+    row.appendChild(labelCell);
+
+    for (let month = 1; month <= 12; month++) {
+        const cell = document.createElement('td');
+        cell.className = `px-4 py-2 text-right tabular-nums ${fontSize} ${bold ? 'font-semibold' : ''}`;
+        cell.style.color = textColor;
+        cell.style.backgroundColor = bgColor;
+        const val = (monthValues || {})[month] || 0;
+        cell.textContent = val === 0 ? '-' : formatCurrency(val);
+        row.appendChild(cell);
+    }
+
+    const annCell = document.createElement('td');
+    annCell.className = `px-4 py-2 text-right tabular-nums ${fontSize} font-semibold`;
+    annCell.style.color = textColor;
+    annCell.style.backgroundColor = annualBg || bgColor;
+    annCell.textContent = formatCurrency(annualValue || 0);
+    row.appendChild(annCell);
+
+    tbody.appendChild(row);
+}
+
+// Renders a data row: Acc No | Desc EN | VN name | monthly... | annual
+function appendDataRow(tbody, code, enName, vnName, monthValues, annualValue, {
+    bgColor = '#ffffff', indent = '1rem', small = true
+} = {}) {
+    const row = document.createElement('tr');
+    row.className = 'hover:bg-gray-100/60 border-b border-gray-100';
+
+    // Acc No
+    const codeCell = document.createElement('td');
+    codeCell.className = 'px-4 py-2 sticky left-0 font-mono text-gray-600 text-xs';
+    codeCell.style.minWidth = COL_DESC_WIDTH + 'px';
+    codeCell.style.width    = COL_DESC_WIDTH + 'px';
+    codeCell.style.zIndex   = '5';
+    codeCell.style.backgroundColor = bgColor;
+    codeCell.textContent = code || '';
+    row.appendChild(codeCell);
+
+    // Desc EN
+    const enCell = document.createElement('td');
+    enCell.className = 'px-4 py-2 sticky text-xs text-gray-600';
+    enCell.style.minWidth = COL_EN_WIDTH + 'px';
+    enCell.style.width    = COL_EN_WIDTH + 'px';
+    enCell.style.left     = COL_ACC_LEFT + 'px';
+    enCell.style.zIndex   = '4';
+    enCell.style.backgroundColor = bgColor;
+    enCell.textContent = enName || '';
+    row.appendChild(enCell);
+
+    // VN name (Desc)
+    const vnCell = document.createElement('td');
+    vnCell.className = 'px-4 py-2 sticky text-xs text-gray-500';
+    vnCell.style.minWidth = COL_VN_WIDTH + 'px';
+    vnCell.style.width    = COL_VN_WIDTH + 'px';
+    vnCell.style.left     = COL_EN_LEFT + 'px';
+    vnCell.style.zIndex   = '4';
+    vnCell.style.backgroundColor = bgColor;
+    vnCell.textContent = vnName || '';
+    row.appendChild(vnCell);
+
+    for (let month = 1; month <= 12; month++) {
+        const cell = document.createElement('td');
+        cell.className = 'px-4 py-2 text-right tabular-nums text-xs text-gray-700';
+        const val = (monthValues || {})[month] || 0;
+        cell.textContent = val === 0 ? '-' : formatCurrency(val);
+        row.appendChild(cell);
+    }
+
+    const annCell = document.createElement('td');
+    annCell.className = 'px-4 py-2 text-right tabular-nums text-xs text-gray-700 bg-gray-50/80';
+    annCell.textContent = formatCurrency(annualValue || 0);
+    row.appendChild(annCell);
+
+    tbody.appendChild(row);
+}
+
+// ── Main render ───────────────────────────────────────────────────────────────
+
 function renderTable(monthlyData, annualData, subAccountsData) {
     const tbody = document.getElementById('table-body');
     tbody.innerHTML = '';
 
     LINE_ITEMS.forEach(item => {
         const lineItem = item.name;
-        const formula = item.formula;
+        const isSubtotal = SUBTOTAL_ITEMS.has(lineItem);
+        const subs = item.computed ? {} : (subAccountsData[lineItem] || {});
+        const hasSubs = Object.keys(subs).length > 0;
 
-        const row = document.createElement('tr');
-
-        // Determine row styling
-        let rowClass = 'divide-x divide-gray-100 hover:bg-gray-50';
-        if (SUBTOTAL_ITEMS.has(lineItem)) {
-            rowClass += ' bg-emerald-50 font-semibold';
+        // Compute totals for this line item
+        const monthValues = {};
+        for (let m = 1; m <= 12; m++) {
+            const md = monthlyData[m] || {};
+            if (item.computed) {
+                monthValues[m] = (md['Lợi nhuận trước thuế'] || 0) - (md['Thuế TNDN'] || 0);
+            } else {
+                monthValues[m] = md[lineItem] || 0;
+            }
         }
+        const annualValue = item.computed
+            ? (annualData['Lợi nhuận trước thuế'] || 0) - (annualData['Thuế TNDN'] || 0)
+            : (annualData[lineItem] || 0);
 
-        row.className = rowClass;
+        // ── Group header row ──
+        const isGreen = isSubtotal;
+        appendGroupHeaderRow(tbody, item.label, monthValues, annualValue, {
+            bgColor:   isGreen ? '#16a34a' : '#4b5563',
+            textColor: '#ffffff',
+            indent:    '1rem',
+            fontSize:  'text-sm',
+            bold:      true,
+        });
 
-        // Line item name + formula
-        const nameCell = document.createElement('td');
-        nameCell.className = 'px-4 py-3 sticky left-0';
-        nameCell.style.minWidth = '200px';
-        nameCell.style.width = '200px';
-        nameCell.style.position = 'sticky';
-        nameCell.style.left = '0';
-        nameCell.style.zIndex = '10';
-        nameCell.style.backgroundColor = SUBTOTAL_ITEMS.has(lineItem) ? '#f0fdf4' : '#ffffff';
+        if (item.computed) return;
 
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'font-medium text-gray-700';
-        nameDiv.textContent = lineItem;
-
-        const formulaDiv = document.createElement('div');
-        formulaDiv.className = 'text-xs text-gray-500 mt-1';
-        formulaDiv.textContent = formula;
-        formulaDiv.style.lineHeight = '1.3';
-
-        nameCell.appendChild(nameDiv);
-        nameCell.appendChild(formulaDiv);
-        row.appendChild(nameCell);
-
-        // Account code column (show fixed code if defined, empty otherwise)
-        const codeCell = document.createElement('td');
-        codeCell.className = 'px-4 py-3 sticky font-mono text-gray-500';
-        codeCell.style.left = '200px';
-        codeCell.style.zIndex = '9';
-        codeCell.style.backgroundColor = SUBTOTAL_ITEMS.has(lineItem) ? '#f0fdf4' : '#ffffff';
-        codeCell.textContent = item.account_code || '';
-        row.appendChild(codeCell);
-
-        // Monthly values
-        for (let month = 1; month <= 12; month++) {
-            const monthData = monthlyData[month] || {};
-            const value = monthData[lineItem] || 0;
-
-            const cell = document.createElement('td');
-            cell.className = 'px-4 py-3 text-right text-gray-800 tabular-nums';
-            cell.textContent = formatCurrency(value);
-            row.appendChild(cell);
-        }
-
-        // Annual total
-        const annualCell = document.createElement('td');
-        annualCell.className = 'px-4 py-3 text-right text-gray-800 font-semibold tabular-nums bg-gray-50';
-        annualCell.textContent = formatCurrency(annualData[lineItem] || 0);
-        row.appendChild(annualCell);
-
-        tbody.appendChild(row);
-
-        // Render sub-account rows
-        const subs = subAccountsData[lineItem] || {};
-
+        // ── Sub-account rows ──
         if (lineItem === 'Giá vốn hàng bán') {
-            // 3-level COGS: sub-header rows + leaf sub-accounts under each
-            const COGS_GROUPS = {
-                '__opening__':    'Giá vốn hàng bán đầu kỳ',
-                '__production__': 'Giá vốn hàng bán phát sinh trong kỳ',
-                '__ending__':     'Giá vốn hàng bán số dư cuối kỳ',
-            };
             const COGS_ORDER = ['__opening__', '__production__', '__ending__'];
-
             COGS_ORDER.forEach(sentinel => {
                 const group = subs[sentinel];
                 if (!group) return;
 
-                // Sub-header row
-                const headerRow = document.createElement('tr');
-                headerRow.className = 'text-xs bg-blue-50/40 hover:bg-blue-50/70';
+                // COGS sub-group header (Opening balance / Purchases / Closing balance)
+                appendGroupHeaderRow(tbody, COGS_GROUP_LABELS[sentinel], group.monthly, group.annual, {
+                    bgColor:   '#3b82f6',
+                    textColor: '#ffffff',
+                    indent:    '2rem',
+                    fontSize:  'text-xs',
+                    bold:      true,
+                });
 
-                const headerNameCell = document.createElement('td');
-                headerNameCell.className = 'px-4 py-2 sticky left-0 font-semibold text-gray-600';
-                headerNameCell.style.minWidth = '200px';
-                headerNameCell.style.width = '200px';
-                headerNameCell.style.position = 'sticky';
-                headerNameCell.style.left = '0';
-                headerNameCell.style.zIndex = '5';
-                headerNameCell.style.backgroundColor = '#eff6ff';
-                headerNameCell.style.paddingLeft = '1.5rem';
-                headerNameCell.textContent = group.name;
-                headerRow.appendChild(headerNameCell);
-
-                const headerCodeCell = document.createElement('td');
-                headerCodeCell.className = 'px-4 py-2 sticky';
-                headerCodeCell.style.left = '200px';
-                headerCodeCell.style.zIndex = '4';
-                headerCodeCell.style.backgroundColor = '#eff6ff';
-                headerCodeCell.textContent = '';
-                headerRow.appendChild(headerCodeCell);
-
-                for (let month = 1; month <= 12; month++) {
-                    const cell = document.createElement('td');
-                    cell.className = 'px-4 py-2 text-right tabular-nums font-semibold text-gray-700';
-                    const val = (group.monthly || {})[month] || 0;
-                    cell.textContent = val === 0 ? '-' : formatCurrency(val);
-                    headerRow.appendChild(cell);
-                }
-
-                const headerAnnualCell = document.createElement('td');
-                headerAnnualCell.className = 'px-4 py-2 text-right tabular-nums font-semibold text-gray-700 bg-blue-50/60';
-                headerAnnualCell.textContent = formatCurrency(group.annual || 0);
-                headerRow.appendChild(headerAnnualCell);
-
-                tbody.appendChild(headerRow);
-
-                // Leaf sub-account rows under this group
-                const groupSubs = group.sub || {};
-                Object.keys(groupSubs).sort().forEach(code => {
-                    const leaf = groupSubs[code];
-                    const leafRow = document.createElement('tr');
-                    leafRow.className = 'text-xs text-gray-500 bg-gray-50/50 hover:bg-gray-100/50';
-
-                    const leafNameCell = document.createElement('td');
-                    leafNameCell.className = 'px-4 py-2 sticky left-0';
-                    leafNameCell.style.minWidth = '200px';
-                    leafNameCell.style.width = '200px';
-                    leafNameCell.style.position = 'sticky';
-                    leafNameCell.style.left = '0';
-                    leafNameCell.style.zIndex = '5';
-                    leafNameCell.style.backgroundColor = '#f9fafb';
-                    leafNameCell.style.paddingLeft = '3rem';
-                    leafNameCell.textContent = leaf.name;
-                    leafRow.appendChild(leafNameCell);
-
-                    const leafCodeCell = document.createElement('td');
-                    leafCodeCell.className = 'px-4 py-2 sticky font-mono';
-                    leafCodeCell.style.left = '200px';
-                    leafCodeCell.style.zIndex = '4';
-                    leafCodeCell.style.backgroundColor = '#f9fafb';
-                    leafCodeCell.textContent = code;
-                    leafRow.appendChild(leafCodeCell);
-
-                    for (let month = 1; month <= 12; month++) {
-                        const cell = document.createElement('td');
-                        cell.className = 'px-4 py-2 text-right tabular-nums';
-                        const val = (leaf.monthly || {})[month] || 0;
-                        cell.textContent = val === 0 ? '-' : formatCurrency(val);
-                        leafRow.appendChild(cell);
-                    }
-
-                    const leafAnnualCell = document.createElement('td');
-                    leafAnnualCell.className = 'px-4 py-2 text-right tabular-nums bg-gray-50/80';
-                    leafAnnualCell.textContent = formatCurrency(leaf.annual || 0);
-                    leafRow.appendChild(leafAnnualCell);
-
-                    tbody.appendChild(leafRow);
+                // Leaf rows under this sub-group
+                Object.keys(group.sub || {}).sort().forEach(code => {
+                    const leaf = group.sub[code];
+                    appendDataRow(tbody, code, accountMappings[code] || '', leaf.name, leaf.monthly, leaf.annual, {
+                        bgColor: '#f8fafc',
+                    });
                 });
             });
         } else {
-            const sortedCodes = Object.keys(subs).sort();
-            sortedCodes.forEach(code => {
+            Object.keys(subs).sort().forEach(code => {
                 const sub = subs[code];
-                const subRow = document.createElement('tr');
-                subRow.className = 'text-xs text-gray-500 bg-gray-50/50 hover:bg-gray-100/50';
-
-                const subNameCell = document.createElement('td');
-                subNameCell.className = 'px-4 py-2 sticky left-0';
-                subNameCell.style.minWidth = '200px';
-                subNameCell.style.width = '200px';
-                subNameCell.style.position = 'sticky';
-                subNameCell.style.left = '0';
-                subNameCell.style.zIndex = '5';
-                subNameCell.style.backgroundColor = '#f9fafb';
-                subNameCell.style.paddingLeft = '2rem';
-                subNameCell.textContent = sub.name;
-                subRow.appendChild(subNameCell);
-
-                const subCodeCell = document.createElement('td');
-                subCodeCell.className = 'px-4 py-2 sticky font-mono';
-                subCodeCell.style.left = '200px';
-                subCodeCell.style.zIndex = '4';
-                subCodeCell.style.backgroundColor = '#f9fafb';
-                subCodeCell.textContent = code;
-                subRow.appendChild(subCodeCell);
-
-                for (let month = 1; month <= 12; month++) {
-                    const cell = document.createElement('td');
-                    cell.className = 'px-4 py-2 text-right tabular-nums';
-                    const val = (sub.monthly || {})[month] || 0;
-                    cell.textContent = val === 0 ? '-' : formatCurrency(val);
-                    subRow.appendChild(cell);
-                }
-
-                const annualSubCell = document.createElement('td');
-                annualSubCell.className = 'px-4 py-2 text-right tabular-nums bg-gray-50/80';
-                annualSubCell.textContent = formatCurrency(sub.annual || 0);
-                subRow.appendChild(annualSubCell);
-
-                tbody.appendChild(subRow);
+                appendDataRow(tbody, code, accountMappings[code] || '', sub.name, sub.monthly, sub.annual, {
+                    bgColor: '#f8fafc',
+                });
             });
         }
     });

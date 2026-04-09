@@ -4,3 +4,4 @@ from app.models.app_setting import AppSetting
 from app.models.shared_key import SharedKey
 from app.models.app_registry import App
 from app.models.pl_sdck import PLSDCK
+from app.models.account_mapping import AccountMapping

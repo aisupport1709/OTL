@@ -5,6 +5,7 @@ from werkzeug.utils import secure_filename
 from app import db
 from app.models.pl_entry import PLEntry
 from app.models.pl_sdck import PLSDCK
+from app.models.account_mapping import AccountMapping
 from app.services.pl_import import (
     import_pl_file, import_pl_google_sheet, calculate_pl, get_available_years
 )
@@ -237,6 +238,11 @@ def export_pl_report():
             'cogs_production': '__production__',
             'cogs_ending':     '__ending__',
         }
+        COGS_GROUP_LABELS_EN = {
+            '__opening__':    'Opening balance',
+            '__production__': 'Purchases',
+            '__ending__':     'Closing balance',
+        }
         COGS_LABELS = {
             'cogs_opening':    'Giá vốn hàng bán đầu kỳ',
             'cogs_production': 'Giá vốn hàng bán phát sinh trong kỳ',
@@ -292,6 +298,9 @@ def export_pl_report():
 
         sub_accounts_by_line['Giá vốn hàng bán'] = cogs_groups
 
+        # Load account mappings for EN name column
+        all_mappings = {m.local_code: m.hq_code for m in AccountMapping.query.all()}
+
         # Build Excel workbook
         wb = Workbook()
         ws = wb.active
@@ -314,45 +323,55 @@ def export_pl_report():
             bottom=Side(style='thin'),
         )
 
+        MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
         SUBTOTAL_ITEMS = {'Lợi nhuận gộp', 'Lợi nhuận thuần từ HĐKD', 'Lợi nhuận trước thuế'}
-        LINE_ITEMS = [
-            'Doanh thu thuần',
-            'Giá vốn hàng bán',
-            'Lợi nhuận gộp',
-            'Chi phí QLDN',
-            'Lợi nhuận thuần từ HĐKD',
-            'Doanh thu HĐTC',
-            'Chi phí tài chính',
-            'Thu nhập khác',
-            'Chi phí khác',
-            'Lợi nhuận trước thuế',
-            'Thuế TNDN',
+        # (name_key, en_label, acc_code, is_computed)
+        LINE_ITEMS_EXPORT = [
+            ('Doanh thu thuần',          'REVENUE',                                                    None,   False),
+            ('Giá vốn hàng bán',         'COST OF GOODS SOLD',                                         None,   False),
+            ('Lợi nhuận gộp',            'Gross profit',                                               None,   False),
+            ('Chi phí QLDN',             'ADMINISTRATION EXPENSES (WITH RED INVOICES)',                 None,   False),
+            ('Lợi nhuận thuần từ HĐKD', 'OPERATING PROFIT FROM BUSINESS ACTIVITIES (TAX PURPOSE)',    None,   False),
+            ('Doanh thu HĐTC',           'FINANCIAL INCOME',                                           None,   False),
+            ('Chi phí tài chính',        'FINANCIAL EXPENSES',                                         None,   False),
+            ('Thu nhập khác',            'OTHER INCOMES',                                              None,   False),
+            ('Chi phí khác',             'OTHER EXPENSES (Without RED INVOICES)',                      None,   False),
+            ('Lợi nhuận trước thuế',     'PROFIT/(LOSS) BEFORE TAXATION',                              None,   False),
+            ('Thuế TNDN',                'INCOME TAX',                                                 '8211', False),
+            ('__profit_after_tax__',     'PROFIT AFTER TAXATION',                                      None,   True),
         ]
 
-        # Header row
-        ws['A1'] = 'Chỉ Tiêu'
-        ws['B1'] = 'Mã TK'
-        ws['A1'].font = header_font
-        ws['B1'].font = header_font
-        ws['A1'].fill = header_fill
-        ws['B1'].fill = header_fill
-        ws['A1'].alignment = center_align
-        ws['B1'].alignment = center_align
-        ws['A1'].border = thin_border
-        ws['B1'].border = thin_border
+        # Column layout: A=Description, B=Acc No, C=Desc EN, D..O=months, P=Annual FS
+        # months start at col 4 (D), annual at col 16 (P)
+        MONTH_START_COL = 4
+        ANNUAL_COL = MONTH_START_COL + 12  # 16
 
-        for month in range(1, 13):
-            col_letter = get_column_letter(month + 2)
+        # Header row
+        ws['A1'] = 'Description'
+        ws['B1'] = 'Acc No'
+        ws['C1'] = 'Account name (EN)'
+        for col_letter_hdr, hdr_val in [('A', 'Description'), ('B', 'Acc No'), ('C', 'Desc EN')]:
+            c = ws[f'{col_letter_hdr}1']
+            c.value = hdr_val
+            c.font = header_font
+            c.fill = header_fill
+            c.alignment = center_align
+            c.border = thin_border
+
+        for i, month_name in enumerate(MONTH_NAMES):
+            col_letter = get_column_letter(MONTH_START_COL + i)
             cell = ws[f'{col_letter}1']
-            cell.value = f'Tháng {month}'
+            cell.value = month_name
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = center_align
             cell.border = thin_border
 
         # Annual column
-        annual_col = get_column_letter(15)
-        ws[f'{annual_col}1'] = 'Tổng Năm'
+        annual_col = get_column_letter(ANNUAL_COL)
+        ws[f'{annual_col}1'] = 'Annual FS'
         ws[f'{annual_col}1'].font = header_font
         ws[f'{annual_col}1'].fill = header_fill
         ws[f'{annual_col}1'].alignment = center_align
@@ -360,47 +379,59 @@ def export_pl_report():
 
         # Data rows
         row = 2
-        for line_item in LINE_ITEMS:
-            is_subtotal = line_item in SUBTOTAL_ITEMS
+        for (line_item, en_label, acc_code, is_computed) in LINE_ITEMS_EXPORT:
+            is_subtotal = (line_item in SUBTOTAL_ITEMS) or is_computed
+            row_font = subtotal_font if is_subtotal else main_row_font
+            row_fill = subtotal_fill if is_subtotal else main_row_fill
 
-            # Main line row
-            ws[f'A{row}'] = line_item
-            ws[f'B{row}'] = '8211' if line_item == 'Thuế TNDN' else ''
-            ws[f'A{row}'].font = (subtotal_font if is_subtotal else main_row_font)
-            ws[f'B{row}'].font = (subtotal_font if is_subtotal else main_row_font)
-            ws[f'A{row}'].fill = (subtotal_fill if is_subtotal else main_row_fill)
-            ws[f'B{row}'].fill = (subtotal_fill if is_subtotal else main_row_fill)
-            ws[f'A{row}'].border = thin_border
-            ws[f'B{row}'].border = thin_border
+            # EN name from mapping if acc_code known
+            en_name = all_mappings.get(acc_code, '') if acc_code else ''
 
-            for month in range(1, 13):
-                col_letter = get_column_letter(month + 2)
+            ws[f'A{row}'] = en_label
+            ws[f'B{row}'] = acc_code or ''
+            ws[f'C{row}'] = en_name
+            for col_key in ('A', 'B', 'C'):
+                ws[f'{col_key}{row}'].font = row_font
+                ws[f'{col_key}{row}'].fill = row_fill
+                ws[f'{col_key}{row}'].border = thin_border
+
+            for i in range(12):
+                col_letter = get_column_letter(MONTH_START_COL + i)
                 cell = ws[f'{col_letter}{row}']
-                value = cleaned_monthly.get(month, {}).get(line_item, 0)
+                if is_computed:
+                    value = (cleaned_monthly.get(i + 1, {}).get('Lợi nhuận trước thuế', 0)
+                             - cleaned_monthly.get(i + 1, {}).get('Thuế TNDN', 0))
+                else:
+                    value = cleaned_monthly.get(i + 1, {}).get(line_item, 0)
                 cell.value = value if value != 0 else None
-                cell.font = (subtotal_font if is_subtotal else main_row_font)
-                cell.fill = (subtotal_fill if is_subtotal else main_row_fill)
+                cell.font = row_font
+                cell.fill = row_fill
                 cell.alignment = right_align
                 cell.number_format = '#,##0;(#,##0)'
                 cell.border = thin_border
 
-            # Annual value
             annual_cell = ws[f'{annual_col}{row}']
-            annual_value = annual_totals.get(line_item, 0)
+            if is_computed:
+                annual_value = (annual_totals.get('Lợi nhuận trước thuế', 0)
+                                - annual_totals.get('Thuế TNDN', 0))
+            else:
+                annual_value = annual_totals.get(line_item, 0)
             annual_cell.value = annual_value if annual_value != 0 else None
-            annual_cell.font = (subtotal_font if is_subtotal else main_row_font)
-            annual_cell.fill = (subtotal_fill if is_subtotal else main_row_fill)
+            annual_cell.font = row_font
+            annual_cell.fill = row_fill
             annual_cell.alignment = right_align
             annual_cell.number_format = '#,##0;(#,##0)'
             annual_cell.border = thin_border
 
             row += 1
 
+            if is_computed:
+                continue  # no sub-rows for computed items
+
             # Sub-account rows
             subs = sub_accounts_by_line.get(line_item, {})
 
             if line_item == 'Giá vốn hàng bán':
-                # 3-level COGS structure: sub-header rows + leaf sub-accounts
                 cogs_sub_header_fill = PatternFill(start_color='EBF3FB', end_color='EBF3FB', fill_type='solid')
                 cogs_sub_header_font = Font(bold=True, italic=True, size=9)
                 cogs_leaf_font = Font(size=9)
@@ -411,20 +442,18 @@ def export_pl_report():
                     if not group:
                         continue
 
-                    # Sub-header row (đầu kỳ / phát sinh / cuối kỳ)
-                    ws[f'A{row}'] = f'  {group["name"]}'
+                    ws[f'A{row}'] = f'  {COGS_GROUP_LABELS_EN[sentinel]}'
                     ws[f'B{row}'] = ''
-                    ws[f'A{row}'].font = cogs_sub_header_font
-                    ws[f'B{row}'].font = cogs_sub_header_font
-                    ws[f'A{row}'].fill = cogs_sub_header_fill
-                    ws[f'B{row}'].fill = cogs_sub_header_fill
-                    ws[f'A{row}'].border = thin_border
-                    ws[f'B{row}'].border = thin_border
+                    ws[f'C{row}'] = ''
+                    for col_key in ('A', 'B', 'C'):
+                        ws[f'{col_key}{row}'].font = cogs_sub_header_font
+                        ws[f'{col_key}{row}'].fill = cogs_sub_header_fill
+                        ws[f'{col_key}{row}'].border = thin_border
 
-                    for month in range(1, 13):
-                        col_letter = get_column_letter(month + 2)
+                    for i in range(12):
+                        col_letter = get_column_letter(MONTH_START_COL + i)
                         cell = ws[f'{col_letter}{row}']
-                        value = group.get('monthly', {}).get(month, 0)
+                        value = group.get('monthly', {}).get(i + 1, 0)
                         cell.value = value if value != 0 else None
                         cell.font = cogs_sub_header_font
                         cell.fill = cogs_sub_header_fill
@@ -442,21 +471,20 @@ def export_pl_report():
                     annual_cell.border = thin_border
                     row += 1
 
-                    # Leaf sub-account rows under this group
-                    group_subs = group.get('sub', {})
-                    for code in sorted(group_subs.keys()):
-                        leaf = group_subs[code]
+                    for code in sorted(group.get('sub', {}).keys()):
+                        leaf = group['sub'][code]
+                        leaf_en = all_mappings.get(code, '')
                         ws[f'A{row}'] = f'      {leaf["name"]}'
                         ws[f'B{row}'] = code
-                        ws[f'A{row}'].font = cogs_leaf_font
-                        ws[f'B{row}'].font = cogs_leaf_font
-                        ws[f'A{row}'].border = thin_border
-                        ws[f'B{row}'].border = thin_border
+                        ws[f'C{row}'] = leaf_en
+                        for col_key in ('A', 'B', 'C'):
+                            ws[f'{col_key}{row}'].font = cogs_leaf_font
+                            ws[f'{col_key}{row}'].border = thin_border
 
-                        for month in range(1, 13):
-                            col_letter = get_column_letter(month + 2)
+                        for i in range(12):
+                            col_letter = get_column_letter(MONTH_START_COL + i)
                             cell = ws[f'{col_letter}{row}']
-                            value = leaf.get('monthly', {}).get(month, 0)
+                            value = leaf.get('monthly', {}).get(i + 1, 0)
                             cell.value = value if value != 0 else None
                             cell.font = cogs_leaf_font
                             cell.alignment = right_align
@@ -474,17 +502,18 @@ def export_pl_report():
             else:
                 for code in sorted(subs.keys()):
                     sub = subs[code]
+                    sub_en = all_mappings.get(code, '')
                     ws[f'A{row}'] = f'    {sub["name"]}'
                     ws[f'B{row}'] = code
-                    ws[f'A{row}'].font = sub_font
-                    ws[f'B{row}'].font = sub_font
-                    ws[f'A{row}'].border = thin_border
-                    ws[f'B{row}'].border = thin_border
+                    ws[f'C{row}'] = sub_en
+                    for col_key in ('A', 'B', 'C'):
+                        ws[f'{col_key}{row}'].font = sub_font
+                        ws[f'{col_key}{row}'].border = thin_border
 
-                    for month in range(1, 13):
-                        col_letter = get_column_letter(month + 2)
+                    for i in range(12):
+                        col_letter = get_column_letter(MONTH_START_COL + i)
                         cell = ws[f'{col_letter}{row}']
-                        value = sub.get('monthly', {}).get(month, 0)
+                        value = sub.get('monthly', {}).get(i + 1, 0)
                         cell.value = value if value != 0 else None
                         cell.font = sub_font
                         cell.alignment = right_align
@@ -500,9 +529,10 @@ def export_pl_report():
                     row += 1
 
         # Set column widths
-        ws.column_dimensions['A'].width = 35
-        ws.column_dimensions['B'].width = 15
-        for col in range(3, 16):
+        ws.column_dimensions['A'].width = 40
+        ws.column_dimensions['B'].width = 10
+        ws.column_dimensions['C'].width = 30
+        for col in range(MONTH_START_COL, ANNUAL_COL + 1):
             ws.column_dimensions[get_column_letter(col)].width = 13
 
         # Return file
@@ -536,3 +566,334 @@ def delete_all_pl_data():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Failed to delete data: {str(e)}'}), 500
+
+
+# ─── API: Account Mapping ────────────────────────────────────────────
+@pl_api_bp.route('/mappings', methods=['GET'])
+@login_required
+@app_access_required('pl')
+def get_mappings():
+    """Get all account mappings."""
+    try:
+        mappings = AccountMapping.query.all()
+        return jsonify({
+            'mappings': [
+                {'local_code': m.local_code, 'hq_code': m.hq_code}
+                for m in mappings
+            ]
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch mappings: {str(e)}'}), 500
+
+
+@pl_api_bp.route('/mappings/add', methods=['POST'])
+@login_required
+@app_access_required('pl')
+def add_mapping():
+    """Add a new account mapping."""
+    data = request.get_json() or {}
+    local_code = (data.get('local_code') or '').strip()
+    hq_code = (data.get('hq_code') or '').strip()
+
+    if not local_code or not hq_code:
+        return jsonify({'error': 'Both local_code and hq_code are required'}), 400
+
+    try:
+        # Check if mapping already exists
+        existing = AccountMapping.query.filter_by(local_code=local_code).first()
+        if existing:
+            return jsonify({'error': f'Mapping for {local_code} already exists'}), 400
+
+        mapping = AccountMapping(local_code=local_code, hq_code=hq_code)
+        db.session.add(mapping)
+        db.session.commit()
+        return jsonify({'message': f'Mapping added: {local_code} -> {hq_code}'}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to add mapping: {str(e)}'}), 500
+
+
+@pl_api_bp.route('/mappings/<local_code>', methods=['DELETE'])
+@login_required
+@app_access_required('pl')
+def delete_mapping(local_code):
+    """Delete an account mapping."""
+    try:
+        mapping = AccountMapping.query.filter_by(local_code=local_code).first()
+        if not mapping:
+            return jsonify({'error': f'Mapping for {local_code} not found'}), 404
+
+        db.session.delete(mapping)
+        db.session.commit()
+        return jsonify({'message': f'Mapping deleted: {local_code}'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to delete mapping: {local_code}: {str(e)}'}), 500
+
+
+@pl_api_bp.route('/mappings/import-excel', methods=['POST'])
+@login_required
+@app_access_required('pl')
+def import_mappings_excel():
+    """Import account mappings from Excel file."""
+    import pandas as pd
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    if not allowed_file(file.filename):
+        return jsonify({'error': 'Only .xlsx and .xls files are allowed'}), 400
+
+    filename = secure_filename(file.filename)
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    os.makedirs(upload_folder, exist_ok=True)
+    filepath = os.path.join(upload_folder, filename)
+    file.save(filepath)
+
+    try:
+        # Detect file type
+        is_xls = filepath.lower().endswith('.xls')
+        engine = 'xlrd' if is_xls else 'openpyxl'
+
+        # Read Excel file
+        df = pd.read_excel(filepath, engine=engine)
+        df.columns = df.columns.str.strip()
+
+        # Find columns (try common names)
+        local_col = None
+        hq_col = None
+
+        for col in df.columns:
+            col_lower = str(col).lower().strip()
+            if 'local' in col_lower or 'local code' in col_lower:
+                local_col = col
+            if 'hq' in col_lower or 'map' in col_lower or 'hq code' in col_lower:
+                hq_col = col
+
+        # If not found, use first two columns
+        if not local_col or not hq_col:
+            cols = list(df.columns)
+            if len(cols) >= 2:
+                local_col = cols[0]
+                hq_col = cols[1]
+            else:
+                return jsonify({'error': 'File must have at least 2 columns'}), 400
+
+        success_count = 0
+        error_count = 0
+        errors = []
+
+        for idx, row in df.iterrows():
+            try:
+                # Fix 1: strip .0 from numeric codes (pandas reads as float)
+                raw = str(row.get(local_col, '')).strip()
+                try:
+                    local_code = str(int(float(raw)))
+                except (ValueError, TypeError):
+                    local_code = raw
+
+                hq_code = str(row.get(hq_col, '')).strip()
+
+                if not local_code or not hq_code or local_code == 'nan':
+                    continue
+
+                # Fix 2: upsert instead of skip
+                existing = AccountMapping.query.filter_by(local_code=local_code).first()
+                if existing:
+                    existing.hq_code = hq_code
+                else:
+                    db.session.add(AccountMapping(local_code=local_code, hq_code=hq_code))
+                success_count += 1
+            except Exception as e:
+                error_count += 1
+                errors.append(f"Row {idx + 2}: {str(e)}")
+
+        db.session.commit()
+
+        return jsonify({
+            'message': f'Imported {success_count} mappings, {error_count} errors',
+            'success_count': success_count,
+            'error_count': error_count,
+            'errors': errors[:20],
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Import failed: {str(e)}'}), 500
+    finally:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+
+
+@pl_api_bp.route('/mappings/import-google', methods=['POST'])
+@login_required
+@app_access_required('pl')
+def import_mappings_google():
+    """Import account mappings from Google Sheets."""
+    import pandas as pd
+    import tempfile
+    import urllib.request
+
+    data = request.get_json() or {}
+    url = (data.get('url') or '').strip()
+
+    if not url:
+        return jsonify({'error': 'No Google Sheets URL provided'}), 400
+
+    if 'docs.google.com/spreadsheets' not in url:
+        return jsonify({'error': 'Invalid Google Sheets URL'}), 400
+
+    try:
+        # Extract spreadsheet ID
+        import re
+        match = re.search(r'/spreadsheets/d/([a-zA-Z0-9_-]+)', url)
+        if not match:
+            return jsonify({'error': 'Invalid Google Sheets URL'}), 400
+
+        sheet_id = match.group(1)
+        export_url = f'https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx'
+
+        # Download file
+        tmp_fd, tmp_path = tempfile.mkstemp(suffix='.xlsx')
+
+        try:
+            urllib.request.urlretrieve(export_url, tmp_path)
+
+            # Read Excel file
+            df = pd.read_excel(tmp_path, engine='openpyxl')
+            df.columns = df.columns.str.strip()
+
+            # Find columns
+            local_col = None
+            hq_col = None
+
+            for col in df.columns:
+                col_lower = str(col).lower().strip()
+                if 'local' in col_lower or 'local code' in col_lower:
+                    local_col = col
+                if 'hq' in col_lower or 'map' in col_lower or 'hq code' in col_lower:
+                    hq_col = col
+
+            # If not found, use first two columns
+            if not local_col or not hq_col:
+                cols = list(df.columns)
+                if len(cols) >= 2:
+                    local_col = cols[0]
+                    hq_col = cols[1]
+                else:
+                    return jsonify({'error': 'Sheet must have at least 2 columns'}), 400
+
+            success_count = 0
+            error_count = 0
+            errors = []
+
+            for idx, row in df.iterrows():
+                try:
+                    # Fix 1: strip .0 from numeric codes (pandas reads as float)
+                    raw = str(row.get(local_col, '')).strip()
+                    try:
+                        local_code = str(int(float(raw)))
+                    except (ValueError, TypeError):
+                        local_code = raw
+
+                    hq_code = str(row.get(hq_col, '')).strip()
+
+                    if not local_code or not hq_code or local_code == 'nan':
+                        continue
+
+                    # Fix 2: upsert instead of skip
+                    existing = AccountMapping.query.filter_by(local_code=local_code).first()
+                    if existing:
+                        existing.hq_code = hq_code
+                    else:
+                        db.session.add(AccountMapping(local_code=local_code, hq_code=hq_code))
+                    success_count += 1
+                except Exception as e:
+                    error_count += 1
+                    errors.append(f"Row {idx + 2}: {str(e)}")
+
+            db.session.commit()
+
+            return jsonify({
+                'message': f'Imported {success_count} mappings, {error_count} errors',
+                'success_count': success_count,
+                'error_count': error_count,
+                'errors': errors[:20],
+            })
+        finally:
+            os.close(tmp_fd)
+            os.unlink(tmp_path)
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Import failed: {str(e)}'}), 500
+
+
+@pl_api_bp.route('/mappings/export', methods=['GET'])
+@login_required
+@app_access_required('pl')
+def export_mappings():
+    """Export account mappings to Excel file."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    try:
+        mappings = AccountMapping.query.all()
+
+        if not mappings:
+            return jsonify({'error': 'No mappings to export'}), 400
+
+        # Create workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Mappings'
+
+        # Define styles
+        header_fill = PatternFill(start_color='1F4E78', end_color='1F4E78', fill_type='solid')
+        header_font = Font(bold=True, color='FFFFFF', size=11)
+        center_align = Alignment(horizontal='center', vertical='center')
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin'),
+        )
+
+        # Header row
+        headers = ['Local Code', 'HQ Code']
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_idx)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = center_align
+            cell.border = thin_border
+
+        # Data rows
+        for row_idx, mapping in enumerate(mappings, 2):
+            ws.cell(row=row_idx, column=1).value = mapping.local_code
+            ws.cell(row=row_idx, column=2).value = mapping.hq_code
+
+            for col_idx in range(1, 3):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.border = thin_border
+
+        # Set column widths
+        ws.column_dimensions['A'].width = 25
+        ws.column_dimensions['B'].width = 25
+
+        # Return file
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='Account_Mappings.xlsx',
+        )
+    except Exception as e:
+        return jsonify({'error': f'Export failed: {str(e)}'}), 500

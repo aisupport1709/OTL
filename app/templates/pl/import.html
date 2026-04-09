@@ -2,9 +2,9 @@
 {% block title %}Import P&L Data - OTL P&L{% endblock %}
 
 {% block content %}
-<h2 class="text-2xl font-bold text-gray-800 mb-8"><i class="bi bi-cloud-upload"></i> Import P&L Data</h2>
+<h2 class="text-2xl font-bold text-gray-800 mb-8"><i class="bi bi-cloud-upload"></i> Import & Map P&L Data</h2>
 
-<!-- Import Local PL Data -->
+<!-- SECTION 1: Import Local PL Data -->
 <div class="bg-white rounded-xl shadow-sm mb-8">
     <div class="px-6 py-4 border-b border-gray-100">
         <h3 class="text-lg font-semibold text-gray-800"><i class="bi bi-file-earmark-spreadsheet"></i> Import Local PL Data</h3>
@@ -25,6 +25,38 @@
         <div id="pl-result" class="mt-4 hidden"></div>
     </div>
 </div>
+
+<!-- SECTION 2: Import & Map Account Codes -->
+<div class="bg-white rounded-xl shadow-sm">
+    <div class="px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-semibold text-gray-800"><i class="bi bi-link-45deg"></i> Map Local Account Code to HQ Account</h3>
+        <p class="text-sm text-gray-500 mt-1">Import account mappings from Excel or Google Sheets, then edit and manage them</p>
+    </div>
+    <div class="p-6">
+        <div class="flex gap-3 mb-6">
+            <button onclick="openMappingImportModal()"
+                class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-5 rounded-lg transition shadow text-sm">
+                <i class="bi bi-upload"></i> Import Mapping
+            </button>
+            <button onclick="openMappingEditModal()"
+                class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-5 rounded-lg transition shadow text-sm">
+                <i class="bi bi-pencil-square"></i> Edit Mapping
+            </button>
+            <button onclick="exportMappingData()"
+                class="inline-flex items-center gap-2 border border-emerald-300 text-emerald-600 hover:bg-emerald-50 font-medium py-2 px-5 rounded-lg transition text-sm">
+                <i class="bi bi-download"></i> Export
+            </button>
+            <button onclick="clearMappingData()"
+                class="inline-flex items-center gap-2 border border-red-300 text-red-600 hover:bg-red-50 font-medium py-2 px-5 rounded-lg transition text-sm">
+                <i class="bi bi-trash"></i> Clear All
+            </button>
+        </div>
+
+        <div id="mapping-result" class="mt-4 hidden"></div>
+    </div>
+</div>
+
+<!-- ===== MODALS ===== -->
 
 <!-- Modal: Import Local PL Data -->
 <div id="pl-import-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
@@ -116,11 +148,158 @@
     </div>
 </div>
 
+<!-- Modal: Import Mapping Data -->
+<div id="mapping-import-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+            <h3 class="text-lg font-semibold text-gray-800">Import Account Mappings</h3>
+            <button onclick="closeMappingImportModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+        </div>
+
+        <div class="p-6 space-y-6">
+            <!-- Tabs -->
+            <div class="flex gap-0 bg-gray-200 p-1 rounded-lg">
+                <button type="button" onclick="switchMappingTab('files')"
+                    id="mapping-tab-files" class="flex-1 py-2 px-4 text-sm font-medium text-white bg-emerald-600 rounded-md transition">
+                    <i class="bi bi-file-earmark-excel"></i> Excel Files
+                </button>
+                <button type="button" onclick="switchMappingTab('sheets')"
+                    id="mapping-tab-sheets" class="flex-1 py-2 px-4 text-sm font-medium text-gray-700 hover:text-gray-900 transition">
+                    <i class="bi bi-google"></i> Google Sheets
+                </button>
+            </div>
+
+            <!-- Excel Files Tab -->
+            <div id="mapping-tab-content-files" class="space-y-4">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p class="text-xs text-blue-800"><strong>Format:</strong> Excel with 2 columns: "Account code" and "Map to HQ account"</p>
+                </div>
+                <div>
+                    <label for="mapping-file-input" class="block text-sm font-medium text-gray-700 mb-2">Select Excel Files</label>
+                    <input type="file" id="mapping-file-input" accept=".xlsx,.xls" multiple
+                        class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 border border-gray-300 rounded-lg cursor-pointer">
+                </div>
+                <div id="mapping-file-list" class="text-sm text-gray-500">No files selected</div>
+                <div class="flex gap-3">
+                    <button type="button" onclick="importMappingFiles()"
+                        class="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-5 rounded-lg transition text-sm">
+                        <i class="bi bi-upload"></i> Import Selected Files
+                    </button>
+                    <button type="button" onclick="closeMappingImportModal()"
+                        class="flex-1 border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-5 rounded-lg transition text-sm">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+
+            <!-- Google Sheets Tab -->
+            <div id="mapping-tab-content-sheets" class="hidden space-y-4">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p class="text-xs text-blue-800"><strong>Format:</strong> Google Sheet with 2 columns: "Account code" and "Map to HQ account"</p>
+                </div>
+                <div id="mapping-sheets-container" class="space-y-3"></div>
+                <button type="button" onclick="addMappingSheetURL()"
+                    class="w-full border border-dashed border-emerald-400 text-emerald-700 hover:bg-emerald-50 font-medium py-2 px-5 rounded-lg transition text-sm">
+                    <i class="bi bi-plus-lg"></i> Add Another Sheet URL
+                </button>
+                <div class="flex gap-3">
+                    <button type="button" onclick="importMappingSheets()"
+                        class="flex-1 inline-flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-5 rounded-lg transition text-sm">
+                        <i class="bi bi-cloud-download"></i> Import Sheets
+                    </button>
+                    <button type="button" onclick="closeMappingImportModal()"
+                        class="flex-1 border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-5 rounded-lg transition text-sm">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+
+            <!-- Progress -->
+            <div id="mapping-import-progress" class="hidden">
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div class="bg-emerald-600 h-2.5 rounded-full animate-pulse" style="width: 100%"></div>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Importing mappings...</p>
+            </div>
+
+            <!-- Results -->
+            <div id="mapping-import-results" class="hidden space-y-2"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Edit Mapping Data -->
+<div id="mapping-edit-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+            <h3 class="text-lg font-semibold text-gray-800">Edit Account Mappings</h3>
+            <button onclick="closeMappingEditModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+        </div>
+
+        <div class="p-6 space-y-4">
+            <!-- Add New Mapping -->
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-3">
+                <h4 class="font-semibold text-gray-800 text-sm">Add New Mapping</h4>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Local Code</label>
+                        <input type="text" id="edit-local-code" placeholder="e.g., 5111"
+                            class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">HQ Code</label>
+                        <input type="text" id="edit-hq-code" placeholder="e.g., 50001"
+                            class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">&nbsp;</label>
+                        <button onclick="addMapping()"
+                            class="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-3 rounded-lg transition text-sm">
+                            <i class="bi bi-plus-lg"></i> Add
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mappings Table -->
+            <div class="border border-gray-200 rounded-lg overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Local Code</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">HQ Code</th>
+                            <th class="px-4 py-3 text-center font-semibold text-gray-700 w-24">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="edit-mappings-tbody">
+                        <tr>
+                            <td colspan="3" class="px-4 py-4 text-center text-gray-500">No mappings. Add one above.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex gap-3">
+                <button type="button" onclick="closeMappingEditModal()"
+                    class="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-5 rounded-lg transition text-sm">
+                    <i class="bi bi-check-lg"></i> Done
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
+let mappingsData = {};
 let plUrlInputCount = 0;
+let mappingUrlInputCount = 0;
+
+// ═══════════════════════════════════════════════════════════════════════
+// SECTION 1: IMPORT LOCAL PL DATA
+// ═══════════════════════════════════════════════════════════════════════
 
 function openPLImportModal() {
     document.getElementById('pl-import-modal').classList.remove('hidden');
@@ -282,5 +461,294 @@ async function clearPLData() {
         result.innerHTML = `<div class="p-4 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm"><strong>✗</strong> Error: ${err.message}</div>`;
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// SECTION 2: IMPORT & MAP ACCOUNT CODES
+// ═══════════════════════════════════════════════════════════════════════
+
+async function loadMappingsFromDatabase() {
+    try {
+        const resp = await fetch('/pl/api/mappings');
+        const data = await resp.json();
+        if (resp.ok && data.mappings) {
+            mappingsData = {};
+            data.mappings.forEach(m => {
+                mappingsData[m.local_code] = m.hq_code;
+            });
+        }
+    } catch (err) {
+        console.error('Error loading mappings:', err);
+    }
+}
+
+function openMappingImportModal() {
+    document.getElementById('mapping-import-modal').classList.remove('hidden');
+    mappingUrlInputCount = 0;
+    document.getElementById('mapping-sheets-container').innerHTML = '';
+    addMappingSheetURL();
+    addMappingSheetURL();
+    updateMappingFileList();
+}
+
+function closeMappingImportModal() {
+    document.getElementById('mapping-import-modal').classList.add('hidden');
+    document.getElementById('mapping-import-progress').classList.add('hidden');
+    document.getElementById('mapping-import-results').classList.add('hidden');
+    document.getElementById('mapping-import-results').innerHTML = '';
+}
+
+function switchMappingTab(tab) {
+    document.getElementById('mapping-tab-files').classList.toggle('bg-emerald-600', tab === 'files');
+    document.getElementById('mapping-tab-files').classList.toggle('text-white', tab === 'files');
+    document.getElementById('mapping-tab-sheets').classList.toggle('bg-emerald-600', tab === 'sheets');
+    document.getElementById('mapping-tab-sheets').classList.toggle('text-white', tab === 'sheets');
+    document.getElementById('mapping-tab-content-files').classList.toggle('hidden', tab !== 'files');
+    document.getElementById('mapping-tab-content-sheets').classList.toggle('hidden', tab !== 'sheets');
+}
+
+function updateMappingFileList() {
+    const fileInput = document.getElementById('mapping-file-input');
+    const fileList = document.getElementById('mapping-file-list');
+    const files = fileInput.files;
+    if (files.length === 0) {
+        fileList.innerHTML = '<p class="text-sm text-gray-500">No files selected</p>';
+        return;
+    }
+    fileList.innerHTML = `
+        <div class="bg-gray-50 rounded-lg p-3">
+            <p class="text-sm font-medium text-gray-700 mb-2">Selected Files (${files.length}):</p>
+            <ul class="space-y-1">${Array.from(files).map(f => `<li class="text-sm text-gray-600">• ${f.name}</li>`).join('')}</ul>
+        </div>
+    `;
+}
+
+document.getElementById('mapping-file-input')?.addEventListener('change', updateMappingFileList);
+
+function addMappingSheetURL() {
+    mappingUrlInputCount++;
+    const container = document.getElementById('mapping-sheets-container');
+    const id = mappingUrlInputCount;
+    const div = document.createElement('div');
+    div.id = `mapping-sheet-row-${id}`;
+    div.className = 'border border-gray-200 rounded-lg p-4 space-y-3';
+    div.innerHTML = `
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Google Sheets URL</label>
+            <input type="url" id="mapping-sheet-url-${id}" placeholder="https://docs.google.com/spreadsheets/d/..."
+                class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 outline-none">
+        </div>
+        <div class="flex gap-3">
+            <button type="button" onclick="removeMappingSheetURL(${id})" class="flex-1 inline-flex items-center justify-center gap-2 border border-red-300 text-red-600 hover:bg-red-50 font-medium py-2 px-3 rounded-lg transition text-sm">
+                <i class="bi bi-trash"></i> Remove
+            </button>
+        </div>
+    `;
+    container.appendChild(div);
+}
+
+function removeMappingSheetURL(id) {
+    document.getElementById(`mapping-sheet-row-${id}`)?.remove();
+}
+
+async function importMappingFiles() {
+    const fileInput = document.getElementById('mapping-file-input');
+    const files = fileInput.files;
+    if (files.length === 0) {
+        alert('Please select at least one file');
+        return;
+    }
+    document.getElementById('mapping-import-progress').classList.remove('hidden');
+    const resultsDiv = document.getElementById('mapping-import-results');
+    resultsDiv.innerHTML = '';
+    resultsDiv.classList.remove('hidden');
+
+    let successCount = 0, failCount = 0;
+    for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const resp = await fetch('/pl/api/mappings/import-excel', { method: 'POST', body: formData });
+            const data = await resp.json();
+            if (resp.ok) {
+                successCount++;
+                resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm"><strong>✓ ${file.name}:</strong> ${data.message}</div>`;
+                if (data.errors && data.errors.length > 0) {
+                    data.errors.forEach(err => {
+                        resultsDiv.innerHTML += `<div class="p-2 rounded-lg bg-yellow-50 text-yellow-700 border border-yellow-200 text-xs ml-4">${err}</div>`;
+                    });
+                }
+            } else {
+                failCount++;
+                resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm"><strong>✗ ${file.name}:</strong> ${data.error}</div>`;
+            }
+        } catch (err) {
+            failCount++;
+            resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm"><strong>✗ ${file.name}:</strong> ${err.message}</div>`;
+        }
+    }
+    resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-sm mt-3"><strong>Summary:</strong> ${successCount} succeeded, ${failCount} failed</div>`;
+    document.getElementById('mapping-import-progress').classList.add('hidden');
+    await loadMappingsFromDatabase();
+}
+
+async function importMappingSheets() {
+    const container = document.getElementById('mapping-sheets-container');
+    const rows = container.querySelectorAll('[id^="mapping-sheet-row-"]');
+    if (rows.length === 0) {
+        alert('Please add at least one Google Sheets URL');
+        return;
+    }
+    document.getElementById('mapping-import-progress').classList.remove('hidden');
+    const resultsDiv = document.getElementById('mapping-import-results');
+    resultsDiv.innerHTML = '';
+    resultsDiv.classList.remove('hidden');
+
+    let successCount = 0, failCount = 0;
+    for (const row of rows) {
+        const id = row.id.replace('mapping-sheet-row-', '');
+        const url = document.getElementById(`mapping-sheet-url-${id}`).value.trim();
+        if (!url) continue;
+        try {
+            const resp = await fetch('/pl/api/mappings/import-google', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url }),
+            });
+            const data = await resp.json();
+            if (resp.ok) {
+                successCount++;
+                resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm"><strong>✓ Sheet ${id}:</strong> ${data.message}</div>`;
+                if (data.errors && data.errors.length > 0) {
+                    data.errors.forEach(err => {
+                        resultsDiv.innerHTML += `<div class="p-2 rounded-lg bg-yellow-50 text-yellow-700 border border-yellow-200 text-xs ml-4">${err}</div>`;
+                    });
+                }
+            } else {
+                failCount++;
+                resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm"><strong>✗ Sheet ${id}:</strong> ${data.error}</div>`;
+            }
+        } catch (err) {
+            failCount++;
+            resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm"><strong>✗ Sheet ${id}:</strong> ${err.message}</div>`;
+        }
+    }
+    resultsDiv.innerHTML += `<div class="p-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-sm mt-3"><strong>Summary:</strong> ${successCount} succeeded, ${failCount} failed</div>`;
+    document.getElementById('mapping-import-progress').classList.add('hidden');
+    await loadMappingsFromDatabase();
+}
+
+async function openMappingEditModal() {
+    await loadMappingsFromDatabase();
+    document.getElementById('mapping-edit-modal').classList.remove('hidden');
+    updateEditMappingsTable();
+}
+
+function closeMappingEditModal() {
+    document.getElementById('mapping-edit-modal').classList.add('hidden');
+}
+
+async function addMapping() {
+    const localCode = document.getElementById('edit-local-code').value.trim();
+    const hqCode = document.getElementById('edit-hq-code').value.trim();
+    if (!localCode || !hqCode) {
+        alert('Please enter both codes');
+        return;
+    }
+    try {
+        const resp = await fetch('/pl/api/mappings/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ local_code: localCode, hq_code: hqCode }),
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+            mappingsData[localCode] = hqCode;
+            updateEditMappingsTable();
+            document.getElementById('edit-local-code').value = '';
+            document.getElementById('edit-hq-code').value = '';
+        } else {
+            alert(`Error: ${data.error}`);
+        }
+    } catch (err) {
+        alert(`Error: ${err.message}`);
+    }
+}
+
+async function removeMapping(localCode) {
+    try {
+        const resp = await fetch(`/pl/api/mappings/${localCode}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (resp.ok) {
+            delete mappingsData[localCode];
+            updateEditMappingsTable();
+        } else {
+            alert(`Error: ${data.error}`);
+        }
+    } catch (err) {
+        alert(`Error: ${err.message}`);
+    }
+}
+
+function updateEditMappingsTable() {
+    const tbody = document.getElementById('edit-mappings-tbody');
+    if (Object.keys(mappingsData).length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-gray-500">No mappings yet.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = Object.entries(mappingsData).map(([local, hq]) => `
+        <tr class="border-t border-gray-200 hover:bg-gray-50">
+            <td class="px-4 py-3 text-gray-900 font-mono">${local}</td>
+            <td class="px-4 py-3 text-gray-900 font-mono">${hq}</td>
+            <td class="px-4 py-3 text-center">
+                <button onclick="removeMapping('${local}')" class="inline-flex items-center gap-1 text-red-600 hover:text-red-700 text-sm">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function exportMappingData() {
+    try {
+        const resp = await fetch('/pl/api/mappings/export');
+        if (resp.ok) {
+            const blob = await resp.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Account_Mappings.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } else {
+            const data = await resp.json();
+            alert(`Export failed: ${data.error}`);
+        }
+    } catch (err) {
+        alert(`Export error: ${err.message}`);
+    }
+}
+
+async function clearMappingData() {
+    if (!confirm('Are you sure you want to delete ALL account mappings?')) return;
+    const result = document.getElementById('mapping-result');
+    let clearedCount = 0;
+    for (const localCode in mappingsData) {
+        try {
+            await fetch(`/pl/api/mappings/${localCode}`, { method: 'DELETE' });
+            clearedCount++;
+        } catch (err) {
+            console.error(`Failed to delete ${localCode}:`, err);
+        }
+    }
+    mappingsData = {};
+    updateEditMappingsTable();
+    result.innerHTML = `<div class="p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm"><strong>✓</strong> Cleared ${clearedCount} mappings</div>`;
+    result.classList.remove('hidden');
+}
+
+// Load mappings on page load
+document.addEventListener('DOMContentLoaded', loadMappingsFromDatabase);
 </script>
 {% endblock %}
