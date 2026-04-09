@@ -308,6 +308,10 @@ def import_sdck_file(file_path, filename, account_target):
         errors.append(f"ERROR: Missing required columns. Expected exactly: 'Tk', 'Tên tk', 'Ps nợ'. Found: {list(df.columns)}")
         return 0, len(errors), errors
 
+    # Delete existing SDCK entries for this month/year/account_target before inserting
+    PLSDCK.query.filter_by(month=month, year=year, account_target=account_target).delete()
+    db.session.flush()
+
     for idx, row in df.iterrows():
         try:
             # Extract account code
@@ -389,6 +393,10 @@ def _import_sdck_dataframe(df, account_target, month, year, source_name):
     if not col_tk or not col_no:
         errors.append(f"ERROR: Missing required columns. Expected exactly: 'Tk', 'Tên tk', 'Ps nợ'. Found: {list(df.columns)}")
         return 0, len(errors), errors
+
+    # Delete existing SDCK entries for this month/year/account_target before inserting
+    PLSDCK.query.filter_by(month=month, year=year, account_target=account_target).delete()
+    db.session.flush()
 
     for idx, row in df.iterrows():
         try:
