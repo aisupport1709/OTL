@@ -23,7 +23,7 @@ def detect_file_type(filename):
     """Detect file type from filename: '911', '154', or 'SDCK'."""
     if 'SDCK' in filename.upper():
         # Extract account number from SDCK filename: "SDCK 1541 01.02.2026"
-        match = re.search(r'SDCK\s+(\d+)', filename, re.IGNORECASE)
+        match = re.search(r'SDCK[\s_]+(\d+)', filename, re.IGNORECASE)
         if match:
             return ('SDCK', match.group(1))
         else:
