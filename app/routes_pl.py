@@ -306,17 +306,27 @@ def export_pl_report():
         ws = wb.active
         ws.title = f'P&L {year}'
 
-        # Define styles
-        header_fill = PatternFill(start_color='1F4E78', end_color='1F4E78', fill_type='solid')
-        header_font = Font(bold=True, color='FFFFFF', size=11)
-        main_row_fill = PatternFill(start_color='D9E1F2', end_color='D9E1F2', fill_type='solid')
-        main_row_font = Font(bold=True, size=10)
-        subtotal_fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')
-        subtotal_font = Font(bold=True, size=10)
-        sub_font = Font(size=9)
+        # ── Styles matching HTML table ──────────────────────────────────
+        # Header row: dark gray (#1f2937 = 1F2937)
+        header_fill  = PatternFill(start_color='1F2937', end_color='1F2937', fill_type='solid')
+        header_font  = Font(bold=True, color='FFFFFF', size=10)
+        # Group header – main (gray #4b5563 = 4B5563)
+        main_hdr_fill = PatternFill(start_color='4B5563', end_color='4B5563', fill_type='solid')
+        main_hdr_font = Font(bold=True, color='FFFFFF', size=10)
+        # Group header – subtotal/green (#16a34a = 16A34A)
+        sub_hdr_fill  = PatternFill(start_color='16A34A', end_color='16A34A', fill_type='solid')
+        sub_hdr_font  = Font(bold=True, color='FFFFFF', size=10)
+        # COGS sub-group header – blue (#3b82f6 = 3B82F6)
+        cogs_hdr_fill = PatternFill(start_color='3B82F6', end_color='3B82F6', fill_type='solid')
+        cogs_hdr_font = Font(bold=True, color='FFFFFF', size=9)
+        # Data rows (leaf)
+        data_fill = PatternFill(start_color='F8FAFC', end_color='F8FAFC', fill_type='solid')
+        data_font = Font(size=9, color='374151')
+
         center_align = Alignment(horizontal='center', vertical='center')
-        right_align = Alignment(horizontal='right', vertical='center')
-        thin_border = Border(
+        left_align   = Alignment(horizontal='left',   vertical='center')
+        right_align  = Alignment(horizontal='right',  vertical='center')
+        thin_border  = Border(
             left=Side(style='thin'),
             right=Side(style='thin'),
             top=Side(style='thin'),
@@ -326,7 +336,8 @@ def export_pl_report():
         MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-        SUBTOTAL_ITEMS = {'Lợi nhuận gộp', 'Lợi nhuận thuần từ HĐKD', 'Lợi nhuận trước thuế'}
+        SUBTOTAL_ITEMS_SET = {'Lợi nhuận gộp', 'Lợi nhuận thuần từ HĐKD', 'Lợi nhuận trước thuế'}
+
         # (name_key, en_label, acc_code, is_computed)
         LINE_ITEMS_EXPORT = [
             ('Doanh thu thuần',          'REVENUE',                                                    None,   False),
@@ -343,197 +354,143 @@ def export_pl_report():
             ('__profit_after_tax__',     'PROFIT AFTER TAXATION',                                      None,   True),
         ]
 
-        # Column layout: A=Description, B=Acc No, C=Desc EN, D..O=months, P=Annual FS
-        # months start at col 4 (D), annual at col 16 (P)
+        # Column layout matching HTML: A=Acc No, B=Description EN, C=Description VN, D..O=months, P=Annual FS
         MONTH_START_COL = 4
         ANNUAL_COL = MONTH_START_COL + 12  # 16
+        annual_col = get_column_letter(ANNUAL_COL)
 
-        # Header row
-        ws['A1'] = 'Description'
-        ws['B1'] = 'Acc No'
-        ws['C1'] = 'Account name (EN)'
-        for col_letter_hdr, hdr_val in [('A', 'Description'), ('B', 'Acc No'), ('C', 'Desc EN')]:
-            c = ws[f'{col_letter_hdr}1']
-            c.value = hdr_val
+        # ── Helper: style a number cell ──────────────────────────────────
+        def set_num_cell(cell, value, font, fill=None):
+            cell.value = value if value != 0 else None
+            cell.font = font
+            if fill:
+                cell.fill = fill
+            cell.alignment = right_align
+            cell.number_format = '#,##0;(#,##0)'
+            cell.border = thin_border
+
+        # ── Helper: write a group header row (merged A:C label) ──────────
+        def write_group_header(row_num, label, month_vals, annual_val, g_fill, g_font):
+            # Merge A:C for the label
+            ws.merge_cells(start_row=row_num, start_column=1, end_row=row_num, end_column=3)
+            lc = ws.cell(row=row_num, column=1, value=label)
+            lc.font = g_font
+            lc.fill = g_fill
+            lc.alignment = left_align
+            lc.border = thin_border
+            # Also apply fill/border to merged cells B and C so they look uniform
+            for col_num in (2, 3):
+                mc = ws.cell(row=row_num, column=col_num)
+                mc.fill = g_fill
+                mc.border = thin_border
+            for i in range(12):
+                set_num_cell(ws.cell(row=row_num, column=MONTH_START_COL + i),
+                             month_vals.get(i + 1, 0), g_font, g_fill)
+            set_num_cell(ws.cell(row=row_num, column=ANNUAL_COL),
+                         annual_val, g_font, g_fill)
+
+        # ── Helper: write a data row (Acc No | Desc EN | Desc VN | months | annual) ──
+        def write_data_row(row_num, acc_no, en_name, vn_name, month_vals, annual_val):
+            for col_num, val in ((1, acc_no or ''), (2, en_name or ''), (3, vn_name or '')):
+                c = ws.cell(row=row_num, column=col_num, value=val)
+                c.font = data_font
+                c.fill = data_fill
+                c.alignment = left_align
+                c.border = thin_border
+            for i in range(12):
+                set_num_cell(ws.cell(row=row_num, column=MONTH_START_COL + i),
+                             month_vals.get(i + 1, 0), data_font, data_fill)
+            set_num_cell(ws.cell(row=row_num, column=ANNUAL_COL),
+                         annual_val, data_font, data_fill)
+
+        # ── Header row ──────────────────────────────────────────────────
+        for col_num, hdr in ((1, 'Acc No'), (2, 'Description EN'), (3, 'Description VN')):
+            c = ws.cell(row=1, column=col_num, value=hdr)
             c.font = header_font
             c.fill = header_fill
             c.alignment = center_align
             c.border = thin_border
 
         for i, month_name in enumerate(MONTH_NAMES):
-            col_letter = get_column_letter(MONTH_START_COL + i)
-            cell = ws[f'{col_letter}1']
-            cell.value = month_name
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = center_align
-            cell.border = thin_border
+            c = ws.cell(row=1, column=MONTH_START_COL + i, value=month_name)
+            c.font = header_font
+            c.fill = header_fill
+            c.alignment = center_align
+            c.border = thin_border
 
-        # Annual column
-        annual_col = get_column_letter(ANNUAL_COL)
-        ws[f'{annual_col}1'] = 'Annual FS'
-        ws[f'{annual_col}1'].font = header_font
-        ws[f'{annual_col}1'].fill = header_fill
-        ws[f'{annual_col}1'].alignment = center_align
-        ws[f'{annual_col}1'].border = thin_border
+        c = ws.cell(row=1, column=ANNUAL_COL, value='Annual FS')
+        c.font = header_font
+        c.fill = header_fill
+        c.alignment = center_align
+        c.border = thin_border
 
-        # Data rows
+        # ── Data rows ────────────────────────────────────────────────────
         row = 2
         for (line_item, en_label, acc_code, is_computed) in LINE_ITEMS_EXPORT:
-            is_subtotal = (line_item in SUBTOTAL_ITEMS) or is_computed
-            row_font = subtotal_font if is_subtotal else main_row_font
-            row_fill = subtotal_fill if is_subtotal else main_row_fill
+            is_subtotal = (line_item in SUBTOTAL_ITEMS_SET) or is_computed
+            g_fill = sub_hdr_fill if is_subtotal else main_hdr_fill
+            g_font = sub_hdr_font if is_subtotal else main_hdr_font
 
-            # EN name from mapping if acc_code known
-            en_name = all_mappings.get(acc_code, '') if acc_code else ''
-
-            ws[f'A{row}'] = en_label
-            ws[f'B{row}'] = acc_code or ''
-            ws[f'C{row}'] = en_name
-            for col_key in ('A', 'B', 'C'):
-                ws[f'{col_key}{row}'].font = row_font
-                ws[f'{col_key}{row}'].fill = row_fill
-                ws[f'{col_key}{row}'].border = thin_border
-
+            # Compute month/annual values
+            month_vals = {}
             for i in range(12):
-                col_letter = get_column_letter(MONTH_START_COL + i)
-                cell = ws[f'{col_letter}{row}']
                 if is_computed:
-                    value = (cleaned_monthly.get(i + 1, {}).get('Lợi nhuận trước thuế', 0)
-                             - cleaned_monthly.get(i + 1, {}).get('Thuế TNDN', 0))
+                    month_vals[i + 1] = (
+                        cleaned_monthly.get(i + 1, {}).get('Lợi nhuận trước thuế', 0)
+                        - cleaned_monthly.get(i + 1, {}).get('Thuế TNDN', 0)
+                    )
                 else:
-                    value = cleaned_monthly.get(i + 1, {}).get(line_item, 0)
-                cell.value = value if value != 0 else None
-                cell.font = row_font
-                cell.fill = row_fill
-                cell.alignment = right_align
-                cell.number_format = '#,##0;(#,##0)'
-                cell.border = thin_border
+                    month_vals[i + 1] = cleaned_monthly.get(i + 1, {}).get(line_item, 0)
 
-            annual_cell = ws[f'{annual_col}{row}']
             if is_computed:
-                annual_value = (annual_totals.get('Lợi nhuận trước thuế', 0)
-                                - annual_totals.get('Thuế TNDN', 0))
+                annual_val = (annual_totals.get('Lợi nhuận trước thuế', 0)
+                              - annual_totals.get('Thuế TNDN', 0))
             else:
-                annual_value = annual_totals.get(line_item, 0)
-            annual_cell.value = annual_value if annual_value != 0 else None
-            annual_cell.font = row_font
-            annual_cell.fill = row_fill
-            annual_cell.alignment = right_align
-            annual_cell.number_format = '#,##0;(#,##0)'
-            annual_cell.border = thin_border
+                annual_val = annual_totals.get(line_item, 0)
 
+            # Group header row (merged A:C)
+            write_group_header(row, en_label, month_vals, annual_val, g_fill, g_font)
             row += 1
 
             if is_computed:
-                continue  # no sub-rows for computed items
+                continue
 
             # Sub-account rows
             subs = sub_accounts_by_line.get(line_item, {})
 
             if line_item == 'Giá vốn hàng bán':
-                cogs_sub_header_fill = PatternFill(start_color='EBF3FB', end_color='EBF3FB', fill_type='solid')
-                cogs_sub_header_font = Font(bold=True, italic=True, size=9)
-                cogs_leaf_font = Font(size=9)
-
                 COGS_ORDER = ['__opening__', '__production__', '__ending__']
                 for sentinel in COGS_ORDER:
                     group = subs.get(sentinel)
                     if not group:
                         continue
 
-                    ws[f'A{row}'] = f'  {COGS_GROUP_LABELS_EN[sentinel]}'
-                    ws[f'B{row}'] = ''
-                    ws[f'C{row}'] = ''
-                    for col_key in ('A', 'B', 'C'):
-                        ws[f'{col_key}{row}'].font = cogs_sub_header_font
-                        ws[f'{col_key}{row}'].fill = cogs_sub_header_fill
-                        ws[f'{col_key}{row}'].border = thin_border
-
-                    for i in range(12):
-                        col_letter = get_column_letter(MONTH_START_COL + i)
-                        cell = ws[f'{col_letter}{row}']
-                        value = group.get('monthly', {}).get(i + 1, 0)
-                        cell.value = value if value != 0 else None
-                        cell.font = cogs_sub_header_font
-                        cell.fill = cogs_sub_header_fill
-                        cell.alignment = right_align
-                        cell.number_format = '#,##0;(#,##0)'
-                        cell.border = thin_border
-
-                    annual_cell = ws[f'{annual_col}{row}']
-                    annual_val = group.get('annual', 0)
-                    annual_cell.value = annual_val if annual_val != 0 else None
-                    annual_cell.font = cogs_sub_header_font
-                    annual_cell.fill = cogs_sub_header_fill
-                    annual_cell.alignment = right_align
-                    annual_cell.number_format = '#,##0;(#,##0)'
-                    annual_cell.border = thin_border
+                    # COGS sub-group header row (merged A:C, blue)
+                    write_group_header(row, COGS_GROUP_LABELS_EN[sentinel],
+                                       group.get('monthly', {}), group.get('annual', 0),
+                                       cogs_hdr_fill, cogs_hdr_font)
                     row += 1
 
                     for code in sorted(group.get('sub', {}).keys()):
                         leaf = group['sub'][code]
                         leaf_en = all_mappings.get(code, '')
-                        ws[f'A{row}'] = f'      {leaf["name"]}'
-                        ws[f'B{row}'] = code
-                        ws[f'C{row}'] = leaf_en
-                        for col_key in ('A', 'B', 'C'):
-                            ws[f'{col_key}{row}'].font = cogs_leaf_font
-                            ws[f'{col_key}{row}'].border = thin_border
-
-                        for i in range(12):
-                            col_letter = get_column_letter(MONTH_START_COL + i)
-                            cell = ws[f'{col_letter}{row}']
-                            value = leaf.get('monthly', {}).get(i + 1, 0)
-                            cell.value = value if value != 0 else None
-                            cell.font = cogs_leaf_font
-                            cell.alignment = right_align
-                            cell.number_format = '#,##0;(#,##0)'
-                            cell.border = thin_border
-
-                        annual_cell = ws[f'{annual_col}{row}']
-                        leaf_annual = leaf.get('annual', 0)
-                        annual_cell.value = leaf_annual if leaf_annual != 0 else None
-                        annual_cell.font = cogs_leaf_font
-                        annual_cell.alignment = right_align
-                        annual_cell.number_format = '#,##0;(#,##0)'
-                        annual_cell.border = thin_border
+                        write_data_row(row, code, leaf_en, leaf['name'],
+                                       leaf.get('monthly', {}), leaf.get('annual', 0))
                         row += 1
             else:
                 for code in sorted(subs.keys()):
                     sub = subs[code]
                     sub_en = all_mappings.get(code, '')
-                    ws[f'A{row}'] = f'    {sub["name"]}'
-                    ws[f'B{row}'] = code
-                    ws[f'C{row}'] = sub_en
-                    for col_key in ('A', 'B', 'C'):
-                        ws[f'{col_key}{row}'].font = sub_font
-                        ws[f'{col_key}{row}'].border = thin_border
-
-                    for i in range(12):
-                        col_letter = get_column_letter(MONTH_START_COL + i)
-                        cell = ws[f'{col_letter}{row}']
-                        value = sub.get('monthly', {}).get(i + 1, 0)
-                        cell.value = value if value != 0 else None
-                        cell.font = sub_font
-                        cell.alignment = right_align
-                        cell.number_format = '#,##0;(#,##0)'
-                        cell.border = thin_border
-
-                    annual_cell = ws[f'{annual_col}{row}']
-                    annual_cell.value = sub.get('annual', 0) if sub.get('annual', 0) != 0 else None
-                    annual_cell.font = sub_font
-                    annual_cell.alignment = right_align
-                    annual_cell.number_format = '#,##0;(#,##0)'
-                    annual_cell.border = thin_border
+                    write_data_row(row, code, sub_en, sub['name'],
+                                   sub.get('monthly', {}), sub.get('annual', 0))
                     row += 1
 
-        # Set column widths
-        ws.column_dimensions['A'].width = 40
-        ws.column_dimensions['B'].width = 10
-        ws.column_dimensions['C'].width = 30
+        # ── Column widths ────────────────────────────────────────────────
+        ws.column_dimensions['A'].width = 15  # Acc No
+        ws.column_dimensions['B'].width = 35  # Description EN
+        ws.column_dimensions['C'].width = 35  # Description VN
         for col in range(MONTH_START_COL, ANNUAL_COL + 1):
-            ws.column_dimensions[get_column_letter(col)].width = 13
+            ws.column_dimensions[get_column_letter(col)].width = 14
 
         # Return file
         output = io.BytesIO()
